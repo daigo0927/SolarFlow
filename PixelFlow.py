@@ -7,31 +7,49 @@ import pickle
 import pdb
 
 # take pre/post frame
-# return pixel flow: shape(ygrid, xgrid, flow_x, flow_y)
+# return pixel flow: shape(ygrid, xgrid, (flow_y,flow_x))
 def PixelFlow(preframe,
               postframe,
-              crop = 7, # crop: discard outer circumference
-              SearchRange = 7, # range for search pixel (radius)
-              NeighborRange = 5): # range for treat as neightbor (radius)
+              SearchRange = 5, # range for search pixel (radius)
+              NeighborRange = 2): # range for treat as neightbor (radius)
 
-    try:
-        if crop < SearchRange:
-            raise ValueError('search range exesses the given map size')
-    except ValueError as e:
-        print(e)
-        
-    def PixelSearch(SearchArea, # area for search flow
-                    pixels): # objective pixel, and surrounding pixels
+    f_size = preframe.shape[0]
 
-        S_size = SearchRange.shape
-        p_size = pixels.shape
+    s_range = SearchRange
+    n_range = NeighborRange
 
-        loss = np.array([[PixelLoss(PostArea = SearchArea[y:y+p_size[0],
-                                                          x:x+p_size[1]],
-                                    PreArea = pixels,
-                                    losstype = 'MSE')\
-                          for x in range(S_size[1] - p_size[1] + 1)]\
-                         for y in range(S_size[0] - p_size[0] + 1)])
+    
+    pixelflow = np.array([[PixelSearch(\
+                            SearchArea = postframe[y-s_range:y+s_range+1,
+                                                   x-s_range:x+s_range+1],
+                            pixels = preframe[y-n_range:y+n_range+1,
+                                              x-n_range:x+n_range+1])\
+                           - np.array([s_range, s_range]) \
+                           for x in np.arange(s_range, f_size-s_range)]\
+                          for y in np.arange(s_range, f_size-s_range)])
+
+    return pixelflow
+    
+
+
+def PixelSearch(SearchArea, # area for search flow
+                pixels): # objective pixel, and surrounding pixels
+
+    S_size = SearchArea.shape
+    p_size = np.array(pixels.shape)
+    
+    loss = np.array([[PixelLoss(PostArea = SearchArea[y:y+p_size[0],
+                                                      x:x+p_size[1]],
+                                PreArea = pixels,
+                                losstype = 'MSE')\
+                      for x in range(S_size[1] - p_size[1] + 1)]\
+                     for y in range(S_size[0] - p_size[0] + 1)])
+    
+    min_idx = np.array([i[0] for i in np.where(loss == np.min(loss))])
+    # return center position of the pixels
+    min_idx = min_idx + (p_size-1.)/2
+
+    return min_idx
 
         
 
@@ -45,6 +63,26 @@ def PixelLoss(PostArea, PreArea, losstype = 'MSE'):
         pass
 
     return np.mean(loss)
+
+
+# visualize pixel flow
+# pixelflow shape(y_len, x_len, 2)
+# pixelflow contents : [y_flow, x_flow]
+# !!! sort axis as sns.heatmap, top-left:(0,0)
+def visFlow(pixelflow, vismargin=5):
+
+    y_len, x_len, _ = pixelflow.shape
+    Y, X = np.mgrid[0:y_len, 0:x_len]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.quiver(X, Y, pixelflow[:,:,1], -pixelflow[:,:,0],
+              facecolor = 'blue')
+    ax.set_ylim([y_len+vismargin, -vismargin])
+    ax.set_xlim([-vismargin, x_len+vismargin])
+
+    
+    
 
     
     
