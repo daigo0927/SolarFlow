@@ -72,9 +72,9 @@ def PixelLoss(PostArea, PreArea, losstype = 'MSE'):
 def visFlow(pixelflow, vismargin=5):
 
     y_len, x_len, _ = pixelflow.shape
-    Y, X = np.mgrid[0:y_len, 0:x_len]
+    X, Y = np.meshgrid(range(x_len), range(y_len))
 
-    fig = plt.figure()
+    fig = sns.plt.figure()
     ax = fig.add_subplot(111)
     ax.quiver(X, Y, pixelflow[:,:,0], -pixelflow[:,:,1],
               facecolor = 'blue')
