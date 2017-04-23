@@ -7,7 +7,7 @@ import pickle
 import pdb
 
 # take pre/post frame
-# return pixel flow: shape(ygrid, xgrid, (flow_y,flow_x))
+# return pixel flow: shape(ygrid, xgrid, [flow_x,flow_y])
 def PixelFlow(preframe,
               postframe,
               SearchRange = 5, # range for search pixel (radius)
@@ -17,7 +17,6 @@ def PixelFlow(preframe,
 
     s_range = SearchRange
     n_range = NeighborRange
-
     
     pixelflow = np.array([[PixelSearch(\
                             SearchArea = postframe[y-s_range:y+s_range+1,
@@ -47,8 +46,9 @@ def PixelSearch(SearchArea, # area for search flow
     
     min_idx = np.array([i[0] for i in np.where(loss == np.min(loss))])
     # return center position of the pixels
-    min_idx = min_idx + (p_size-1.)/2
+    min_idx = min_idx[::-1] + (p_size-1.)/2
 
+    # return pixel movement ([xflow, yflow])
     return min_idx
 
         
@@ -67,7 +67,7 @@ def PixelLoss(PostArea, PreArea, losstype = 'MSE'):
 
 # visualize pixel flow
 # pixelflow shape(y_len, x_len, 2)
-# pixelflow contents : [y_flow, x_flow]
+# pixelflow contents : [xflow, yflow]
 # !!! sort axis as sns.heatmap, top-left:(0,0)
 def visFlow(pixelflow, vismargin=5):
 
@@ -76,10 +76,11 @@ def visFlow(pixelflow, vismargin=5):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.quiver(X, Y, pixelflow[:,:,1], -pixelflow[:,:,0],
+    ax.quiver(X, Y, pixelflow[:,:,0], -pixelflow[:,:,1],
               facecolor = 'blue')
-    ax.set_ylim([y_len+vismargin, -vismargin])
     ax.set_xlim([-vismargin, x_len+vismargin])
+    ax.set_ylim([y_len+vismargin, -vismargin])
+
 
     
     
