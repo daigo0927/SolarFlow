@@ -1,6 +1,7 @@
 # coding:utf-8
 
 import numpy as np
+from scipy.interpolate import interp2d
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
@@ -12,7 +13,8 @@ from PixelFlow import PixelFlow
 
 class SolarFlow:
 
-    def __init__(data,
+    def __init__(self,
+                 data,
                  SearchRange = 5,
                  NeighborRange = 2):
 
@@ -20,36 +22,53 @@ class SolarFlow:
         self.Srange = SearchRange
         self.Nrange = NeighborRange
 
+        # height/weight of data
+        self.size_origin = data.shape[1]
+        self.size_result = self.size_origin - 2*self.Srange
+
         self.FramePairs = np.array([[self.data[i], self.data[i+1]]\
                                     for i in range(len(self.data)-1)])
+
+        self.pool = None
 
         self.flows = None
 
         self.result = None
 
-    def flow():
+    def flow(self):
 
         attr = [[pair[0], pair[1], self.Srange, self.Nrange]\
                 for pair in self.FramePairs]
 
+        self.flows = list(self.pool.map(pflow, attr))
+
+    def interp(self, fineness = 15):
+
         NumCore = np.int(input('input core number : '))
-        pool = Pool(NumCore)
+        self.pool = Pool(NumCore)
 
-        self.flows = list(pool.map(pflow, attr))
+        print('compute pixel flow ...')
+        self.flow()
 
-    def interp(fineness = 15):
-
-        attr = [[pair[0], pair[1], flow] \
+        attr = [[pair[0], pair[1], flow, fineness] \
                 for pair, flow in zip(self.FramePairs, self.flows)]
 
-        NumCore = np.int(input('input core number : '))
-        pool = Pool(NumCore)
+        print('interpolating ...')
+        result = np.array(self.pool.map(pinterp, attr))
+        result = result.reshape(result.shape[0] * result.shape[1],
+                                result.shape[2],
+                                result.shape[3])
 
-        # 渡す処理
-
+        # add final frame
+        finalframe = self.data[-1,
+                               self.Srange:self.size_origin-self.Srange,
+                               self.Srange:self.size_origin-self.Srange]
+        finalframe = finalframe.reshape(1, self.size_result, self.size_result)
         
-        
+        self.result = np.concatenate((result, finalframe), axis = 0)
 
+    def savefig(self, path):
+        pass
         
 
         
@@ -64,24 +83,27 @@ def pflow(preframe_postframe_Srange_Nrange):
 
     return flow
 
-def pinterp(preframe_postframe_pixelflow):
+def pinterp(preframe_postframe_pixelflow_fineness):
 
-    preframe, postframe, pixelflow = preframe_postframe_pixelflow
+    preframe, postframe, pixelflow, fineness = \
+                            preframe_postframe_pixelflow_fineness
 
     interpolated = PixelInterp(preframe = preframe,
                                postframe = postframe,
-                               pixelflow = pixelflow)
+                               pixelflow = pixelflow,
+                               fineness = fineness)
 
     return interpolated
 
 
-def PixelInterp(preframe, postframe, pixelflow):
+def PixelInterp(preframe, postframe, pixelflow, fineness):
 
     frame_size = preframe.shape[0]
     flow_size = pixelflow.shape[0]
 
     rem = (frame_size - flow_size)/2
     rem = np.int(rem)
+    # pixelflow shape(H, W, 2)
     pixelflow = pixelflow.astype(int)
 
     # flow_start : pixel value, each pixels in preframe start
@@ -97,3 +119,18 @@ def PixelInterp(preframe, postframe, pixelflow):
     X, Y = np.meshgrid(range(flow_size), range(flow_size))
 
     # 補間処理
+    # result of interpolation
+    # result = np.array([(1-f/fineness) * flow_start + f/fineness * flow_end \
+    #                    for f in np.arange(fineness)])
+
+    for f in np.arange(fineness):
+
+        X_flowed = X + (f/fineness) * pixelflow[:,:,0]
+        Y_flowed = Y + (f/fineness) * pixelflow[:,:,1]
+
+        p_flowed = (1-f/fineness) * flow_start + f/fineness * flow_end
+
+        # 近傍補完
+
+    return result
+    
