@@ -119,9 +119,8 @@ def PixelInterp(preframe, postframe, pixelflow, fineness):
     X, Y = np.meshgrid(range(flow_size), range(flow_size))
 
     # 補間処理
-    # result of interpolation
-    # result = np.array([(1-f/fineness) * flow_start + f/fineness * flow_end \
-    #                    for f in np.arange(fineness)])
+    
+    result = np.zeros((fineness, flow_size, flow_size))
 
     for f in np.arange(fineness):
 
@@ -130,7 +129,27 @@ def PixelInterp(preframe, postframe, pixelflow, fineness):
 
         p_flowed = (1-f/fineness) * flow_start + f/fineness * flow_end
 
-        # 近傍補完
+        for y in np.arange(flow_size):
+            for x in np.arange(flow_size):
+
+                # 対象の点(x, y)からのそれぞれの距離
+                distmap = np.sqrt((X_flowed - x)**2 + (Y_flowed - y)**2)
+
+                p_flowedseries = p_flowed.reshape((flow_size**2))
+                distseries = distmap.reshape((flow_size**2))
+
+                idx_near = np.argsort(distseries)[:4]
+                p_near = p_flowedseries[idx_near]
+                dist_near = distseries[idx_near] + 1e-3
+                
+                w = np.prod(dist_near)/dist_near
+                weight = w/np.sum(w)
+
+                p_weighted = np.sum(weight * p_near)
+
+                result[f, y, x] = p_weighted
+
+                # pdb.set_trace()
 
     return result
     
