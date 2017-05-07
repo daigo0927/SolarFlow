@@ -2,6 +2,7 @@
 import numpy as np
 import pdb
 
+from scipy.interpolate import interp1d
 
 def Time2Str(year = 2016,
              month = 1,
@@ -86,3 +87,40 @@ def Time2Strings(year = 2016,
             status = False
 
     return TimeStrList
+
+class LinearInterp:
+
+    def __init__(self,
+                 data,
+                 crop = 5):
+
+        self.data = data
+        self.f_len, self.y_len, self.x_len = data.shape
+        self.xgrid = np.arange(self.x_len)
+        self.ygrid = np.arange(self.y_len)
+
+        self.axis_origin = np.arange(self.f_len)
+        self.axis_new = None
+
+        self.interfuncs = None
+
+        self.result = None
+
+    def interp(self, fineness = 15):
+
+        self.axis_new = np.linspace(0, self.f_len-1, (self.f_len-1)*fineness+1)
+
+        self.interfuncs = [[interp1d(self.axis_origin, self.data[:, y, x])\
+                            for x in self.xgrid]\
+                           for y in self.ygrid]
+
+        result = np.array([[self.interfuncs[y][x](self.axis_new)\
+                            for x in self.xgrid]\
+                           for y in self.ygrid])
+
+        self.result = np.transpose(result, (2,0,1))
+
+        
+    
+
+                
