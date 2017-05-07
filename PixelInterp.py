@@ -40,12 +40,18 @@ class SolarFlow:
         attr = [[pair[0], pair[1], self.Srange, self.Nrange]\
                 for pair in self.FramePairs]
 
-        self.flows = list(self.pool.map(pflow, attr))
+        if self.pool == 0:
+            self.flows = list([pflow(att) for att in attr])
+        else:
+            self.flows = list(self.pool.map(pflow, attr))
 
     def interp(self, fineness = 15):
 
         NumCore = np.int(input('input core number : '))
-        self.pool = Pool(NumCore)
+        if NumCore == 0:
+            self.pool = 0
+        else:
+            self.pool = Pool(NumCore)
 
         print('compute pixel flow ...')
         self.flow()
@@ -54,7 +60,11 @@ class SolarFlow:
                 for pair, flow in zip(self.FramePairs, self.flows)]
 
         print('interpolating ...')
-        result = np.array(self.pool.map(pinterp, attr))
+        if self.pool == 0:
+            result = np.array([pinterp(att) for att in attr])
+        else:
+            result = np.array(self.pool.map(pinterp, attr))
+            
         result = result.reshape(result.shape[0] * result.shape[1],
                                 result.shape[2],
                                 result.shape[3])
