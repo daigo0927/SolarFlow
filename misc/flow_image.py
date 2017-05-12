@@ -33,10 +33,28 @@ def draw_flow(preframe, postframe):
     ax2.set_ylim(y_len+5, -5)
     plt.title('pixel flow')
 
-for i in range(10):
-    draw_flow(preframe = data[i], postframe = data[i+1])
-    plt.savefig('/Users/Daigo/Desktop/tmp/flow{}.png'.format(i))
-    plt.close()
+def draw_clowd(clowd1, clowd2):
+    fig = plt.figure(figsize = (11, 4))
+    
+    ax1 = fig.add_subplot(121)
+    sns.heatmap(crowd1,
+                vmin = 0, vmax = 1,
+                cmap = 'YlGnBu_r', annot = False)
+    plt.title('original radiation')
+
+    ax2 = fig.add_subplot(122)
+    sns.heatmap(crowd2,
+                vmin = 0, vmax = 1,
+                cmap = 'YlGnBu_r', annot = False)
+    plt.title('interpolated radiation')
+
+    
+    
+if __name__ == '__main__':
+    for i in range(10):
+        draw_flow(preframe = data[i], postframe = data[i+1])
+        plt.savefig('/Users/Daigo/Desktop/tmp/flow{}.png'.format(i))
+        plt.close()
 
 
     
