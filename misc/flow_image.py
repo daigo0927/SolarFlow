@@ -34,16 +34,20 @@ def draw_flow(preframe, postframe):
     plt.title('pixel flow')
 
 def draw_clowd(clowd1, clowd2):
+    
+    c_size, _ = clowd2.shape
+    drop = int((clowd1.shape[0] - c_size)/2)
+    
     fig = plt.figure(figsize = (11, 4))
     
     ax1 = fig.add_subplot(121)
-    sns.heatmap(crowd1,
+    sns.heatmap(clowd1[drop:drop+c_size, drop:drop+c_size],
                 vmin = 0, vmax = 1,
                 cmap = 'YlGnBu_r', annot = False)
     plt.title('original radiation')
 
     ax2 = fig.add_subplot(122)
-    sns.heatmap(crowd2,
+    sns.heatmap(clowd2,
                 vmin = 0, vmax = 1,
                 cmap = 'YlGnBu_r', annot = False)
     plt.title('interpolated radiation')

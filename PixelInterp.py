@@ -8,6 +8,7 @@ import pickle
 import pdb
 
 from multiprocessing import Pool
+from tqdm import tqdm
 
 from PixelFlow import PixelFlow
 
@@ -41,7 +42,7 @@ class SolarFlow:
                 for pair in self.FramePairs]
 
         if self.pool == 0:
-            self.flows = list([pflow(att) for att in attr])
+            self.flows = list([pflow(att) for att in tqdm(attr)])
         else:
             self.flows = list(self.pool.map(pflow, attr))
 
@@ -61,7 +62,7 @@ class SolarFlow:
 
         print('interpolating ...')
         if self.pool == 0:
-            result = np.array([pinterp(att) for att in attr])
+            result = np.array([pinterp(att) for att in tqdm(attr)])
         else:
             result = np.array(self.pool.map(pinterp, attr))
             
