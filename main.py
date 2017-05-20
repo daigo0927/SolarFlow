@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from SolarFlow import SolarFlow
 from misc.visualize import draw_cloud
+from misc.utils import LinearInterp
 
 
 args = ['main.py', './somesolar.pkl', '-1', '5', '2']
@@ -33,9 +34,14 @@ def main():
                       SearchRange = Srange,
                       NeighborRange = Nrange)
 
-    method = input('select interpolation method [for/bi] : ')
+    method = input('select interpolation method [linear/for/bi] : ')
     fine = int(input('interpolation fineness : '))
-    sflow.interp(fineness = fine, method = method)
+    if method == 'linear':
+        lin = LinearInterp(data = data, crop = Srange)
+        lin.interp(fineness = fine)
+        sflow.result = lin.result
+    else:
+        sflow.interp(fineness = fine, method = method)
     
     save = input('save interp-result image? [y/n] : ')
     if save == 'y':
