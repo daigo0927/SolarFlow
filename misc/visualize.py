@@ -8,9 +8,6 @@ import seaborn as sns
 
 from PixelFlow import PixelFlow, visFlow
 
-with open('/Users/Daigo/Data/ShadeRatio/Machida/2016_8_20_9-12/pickles/ShadeRatio.pkl',
-          'rb') as f:
-    data = pickle.load(f)
 
 def draw_flow(preframe, postframe):
     pre = preframe
@@ -34,6 +31,7 @@ def draw_flow(preframe, postframe):
     ax2.set_ylim(y_len+5, -5)
     plt.title('pixel flow')
 
+
 def draw_cloud(cloud1, cloud2):
     
     c_size, _ = cloud2.shape
@@ -53,57 +51,63 @@ def draw_cloud(cloud1, cloud2):
                 cmap = 'YlGnBu_r', annot = False)
     plt.title('interpolated radiation')
 
-def DoubleVis(cloud_origin, cloud_interp, interval = 200):
+def draw_multicloud(clouds, method = ['origin', 'linear', 'for']):
+    # clouds[0] must be original one
 
-    n_origin, _, w_origin = cloud_origin.shape
-    n_interp, _, w_interp = cloud_interp.shape
+    num_cloud = len(method)
 
-    n_rep = int((n_interp - 1)/(n_origin - 1))
+    c_size, _ = clouds[-1].shape
+    drop = int((clouds[0].shape[0] - c_size)/2)
 
-    fig = plt.figure(figsize = (11, 4))
+    if num_cloud <= 3:
+        ncol = 3
+        nrow = 1
+    else:
+        ncol = 2
+        nrow = np.ceil(num_cloud/2)
+        fig = plt.figure(figsize = (11, 4.5*nrow))
 
-    def update(i, clouds1, clouds2):
-        if i != 0:
-            plt.cla()
+    fig = plt.figure(figsize = (5.5*ncol, 4*nrow))
 
-        cloud1 = clouds1[i//n_rep]
-        cloud2 = clouds2[i]
+    ax_origin = fig.add_subplot(nrow, ncol, 1)
+    sns.heatmap(clouds[0][drop:drop+c_size, drop:drop+c_size],
+                vmin = 0, vmax = 1,
+                cmap = 'YlGnBu_r', annot = False)
+    plt.title('original radiation')
 
-        c_size, _ = cloud2.shape
-        drop = int((cloud1.shape[0] - c_size)/2)
-            
-        plt.subplot(121)
-        sns.heatmap(cloud1[drop:drop+c_size, drop:drop+c_size],
+    for i in np.arange(1,num_cloud):
+        ax = fig.add_subplot(nrow, ncol, i+1)
+        sns.heatmap(clouds[i],
                     vmin = 0, vmax = 1,
                     cmap = 'YlGnBu_r', annot = False)
-        plt.title('original radiation')
+        plt.title('method : {}'.format(method[i]))
 
-        plt.subplot(122)
-        sns.heatmap(cloud2,
-                    vmin = 0, vmax = 1,
-                    cmap = 'YlGnBu_r', annot = False)
-        plt.title('interpolated radiation')
+def draw_fusioncloud(cloud_origin, cloud_fine, method = ''):
 
-    ani = anima.FuncAnimation(fig, update,
-                              fargs = (cloud_origin, cloud_interp),
-                              interval = interval,
-                              frames = n_interp)
+    c_size, _ = cloud_fine.shape
+    drop = int((cloud_origin.shape[0] - c_size)/2)
 
-    return ani
+    cloud_origin = cloud_origin[drop:drop+c_size,
+                                drop:drop+c_size]
+
+    for i in range(cloud_origin.shape[0]):
+        cloud_origin[i, 20-i//3:] = cloud_fine[i, 20-i//3:]
+
+    sns.heatmap(cloud_origin,
+                vmin = 0, vmax = 1,
+                cmap = 'YlGnBu_r', annot = False)
+    plt.title('{} interp origin/interp'.format(method))
+
+                         
+                         
+
+    
+
 
     
     
-
-    
     
 
-    
-    
-if __name__ == '__main__':
-    for i in range(10):
-        draw_flow(preframe = data[i], postframe = data[i+1])
-        plt.savefig('/Users/Daigo/Desktop/tmp/flow{}.png'.format(i))
-        plt.close()
 
 
     
