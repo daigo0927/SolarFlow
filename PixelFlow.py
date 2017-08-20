@@ -82,6 +82,76 @@ def visFlow(pixelflow, vismargin=5):
     ax.set_ylim([y_len+vismargin, -vismargin])
 
 
+# new methods 8/20 -
+
+def _get_loss(search_area, obj_area):
+
+    search_size = search_area.shape
+    obj_size = obj_area.shape
+
+    loss = np.array([[PixelLoss(PostArea = search_area[y:y+obj_size[0],
+                                                       x:x+obj_size[1]],
+                                PreArea = obj_area,
+                                losstype = 'MSE')\
+                      for x in range(search_size[1] - obj_size[1] + 1)]\
+                     for y in range(search_size[0] - obj_size[0] + 1)])
+
+    return loss
+
+def _get_lossmap(preframe,
+                 postframe,
+                 search_range = 5,
+                 neighbor_range = 2):
+
+    frame_size = preframe.shape[0]
+    s_range = search_range
+    n_range = neighbor_range
+
+    lossmap = np.array([[_get_loss(search_area = postframe[y-s_range:y+s_range+1,
+                                                           x-s_range:x+s_range+1],
+                                   obj_area = preframe[y-n_range:y+n_range+1,
+                                                       x-n_range:x+n_range+1])\
+                         for x in np.arange(s_range, frame_size - s_range)]\
+                        for y in np.arange(s_range, frame_size - s_range)])
+
+    return lossmap
+
+def _det_flow(lossmaps):
+
+    if len(lossmaps.shape) == 5:
+        num_frames, map_size, _, flow_range, _ = lossmaps.shape        
+    elif len(lossmaps.shape) == 4:
+        map_size, _, flow_range, _ = lossmaps.shape
+        num_frames = 1
+        lossmaps = lossmaps.reshape(num_frames, map_size, map_size,
+                                    flow_range, flow_range)
+    else:
+        raise ValueError('lossmaps may have invalid shape')
+    
+    # determine pixelflow
+    # shape(map_size-5*(num_frames-1), map_size-5*(num_frames-1), 2)
+
+    retun flow
+    
+def get_flow(frames,
+             search_range = 5,
+             neighbor_range = 2,
+             init = True,
+             preflow = None):
+
+    if not init:
+        assert preflow is None, 'need pre-pixelflow for temporal consistency'
+
+def _space_smoother(flow, theta):
+
+    return smoothed_flow
+
+def get_backflow(forflow):
+    
+    return backflow
+
+
+    
     
     
 
