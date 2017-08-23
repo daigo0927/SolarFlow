@@ -47,7 +47,6 @@ def PixelSearch(SearchArea, # area for search flow
     min_idx = np.array([i[0] for i in np.where(loss == np.min(loss))])
     # return center position of the pixels
     min_idx = min_idx[::-1] + (p_size-1.)/2
-
     # return pixel movement ([xflow, yflow])
     return min_idx
 
@@ -95,7 +94,6 @@ def _get_loss(search_area, obj_area):
                                 losstype = 'MSE')\
                       for x in range(search_size[1] - obj_size[1] + 1)]\
                      for y in range(search_size[0] - obj_size[0] + 1)])
-
     return loss
 
 def _get_lossmap(preframe,
@@ -116,22 +114,62 @@ def _get_lossmap(preframe,
 
     return lossmap
 
-def _det_flow(lossmaps):
-
-    if len(lossmaps.shape) == 5:
-        num_frames, map_size, _, flow_range, _ = lossmaps.shape        
-    elif len(lossmaps.shape) == 4:
-        map_size, _, flow_range, _ = lossmaps.shape
-        num_frames = 1
-        lossmaps = lossmaps.reshape(num_frames, map_size, map_size,
-                                    flow_range, flow_range)
-    else:
-        raise ValueError('lossmaps may have invalid shape')
+def _det_flow(lossmaps, preflow = None):
     
-    # determine pixelflow
-    # shape(map_size-5*(num_frames-1), map_size-5*(num_frames-1), 2)
+    num_frames, map_size, _, flow_range, _ = lossmaps.shape
+    flow_radius = int((flow_range-1)/2)
+    assert num_frames <= 2, 'the case num_frames>2 is not supported yet'
 
-    retun flow
+    if num_frames == 1:
+        cumulative_lossmap = lossmaps[0]
+    else:
+        cumulative_lossmap \
+            = np.array([[_temp_smoother(preloss = lossmaps[0, y, x],
+                                        postloss = lossmaps[1],
+                                        pre_xy = np.array([x, y]))\
+                         for x in np.arange(flow_radius, map_size-flow_radius)]\
+                        for y in np.arange(flow_radius, map_size-flow_radius)])
+        
+    # cumulative_lossmap: shape(30/24, 30/24, 7, 7)
+    # determine pixelflow
+    if preflow is None:
+        flow = np.array([[_det_f(ll) for ll in l]\
+                         for l in cumulative_lossmap])
+    else:
+        assert cumulative_lossmap.shape[:2] == preflow.shape[:2],\
+            'preflow shape error'
+        flow = np.array([[_det_f(ll, pre_f = pre_ff)\
+                          for ll, pre_ff in zip(l, pre_f)]\
+                         for l, pre_f in zip(cumulative_lossmap, preflow)])
+    return flow
+
+def _det_f(loss, pre_f = None):
+
+    if pre_f is not None:
+        pre_f_shift = pre_f + (np.array(loss.shape) - 1.)/2
+        pre_f_shift = np.round(pre_f_shift).astype(int)
+        loss_limit = loss[max(pre_f_shift[1]-1, 0):pre_f_shift[1]+2,
+                          max(pre_f_shift[0]-1, 0):pre_f_shift[0]+2]
+        min_idx = np.array([i[0] for i in np.where(loss == np.min(loss_limit))])
+    else:
+        min_idx = np.array([i[0] for i in np.where(loss == np.min(loss))])
+        
+    min_idx = min_idx[::-1] - (np.array(loss.shape) - 1.)/2
+    # return xy_position at
+    return min_idx
+
+def _temp_smoother(preloss, postloss, pre_xy):
+    # preloss:(7, 7), postloss:(30, 30, 7, 7), xy_origin:(2,)
+    flow_range, _ = preloss.shape
+    flow_radius = int((flow_range-1)/2)
+    cumulative_loss = np.array([[preloss[y, x] \
+                                 + np.min(postloss[pre_xy[1]+(y-flow_radius),
+                                                   pre_xy[0]+(x-flow_radius),
+                                                   max(y-1, 0):y+2,
+                                                   max(x-1, 0):x+2])\
+                                 for x in np.arange(flow_range)]\
+                                for y in np.arange(flow_range)])
+    return cumulative_loss # shape(flow_range, flow_range)
     
 def get_flow(frames,
              search_range = 5,
@@ -140,11 +178,41 @@ def get_flow(frames,
              preflow = None):
 
     if not init:
-        assert preflow is None, 'need pre-pixelflow for temporal consistency'
+        assert preflow is not None, 'need pre-pixelflow for temporal consistency'
 
-def _space_smoother(flow, theta):
+    lossmaps = np.array([_get_lossmap(preframe = pre,
+                                      postframe = post,
+                                      search_range = search_range,
+                                      neighbor_range = neighbor_range)\
+                         for pre, post in zip(frames[:-1], frames[1:])])
 
-    return smoothed_flow
+    flow = _det_flow(lossmaps, preflow = preflow)
+    return flow
+
+def _space_smoother(flow, theta = 2.5): # theta:0-8
+
+    converge = False
+    while not converge:
+        smoothed_flow = np.array([[_s_smoother(flow = flow[max(y-1,0):y+2,
+                                                           max(x-1,0):x+2],
+                                                flow_obj = flow[y,x],
+                                                theta = theta)\
+                                    for x in np.arange(flow.shape[1])]\
+                                   for y in np.arange(flow.shape[0])])
+        flow = smoothed_flow[:, :, :2]
+        if not False in smoothed_flow[:, :, 2]:
+            converge = True
+
+    return flow
+
+def _s_smoother(flow, flow_obj, theta):
+    # flow:shape(3,3,2), flow_obj(2)
+    flow_avg = (np.sum(flow, axis = (0,1)) - flow_obj)/(flow.shape[0]*flow.shape[1]-1)
+    if np.linalg.norm(flow_avg - flow_obj) > theta:
+        flow_smooth = np.append(flow_avg, False) # False -> 0
+    else:
+        flow_smooth = np.append(flow_obj, True) # True -> 1
+    return flow_smooth
 
 def get_backflow(forflow):
     
