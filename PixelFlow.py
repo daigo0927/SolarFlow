@@ -111,7 +111,6 @@ def _get_lossmap(preframe,
                                                        x-n_range:x+n_range+1])\
                          for x in np.arange(s_range, frame_size - s_range)]\
                         for y in np.arange(s_range, frame_size - s_range)])
-
     return lossmap
 
 def _det_flow(lossmaps, preflow = None):
@@ -215,9 +214,41 @@ def _s_smoother(flow, flow_obj, theta):
     return flow_smooth
 
 def get_backflow(forflow):
-    
+
+    map_size, _, _ = forflow.shape
+    preX, preY = np.meshgrid(np.arange(map_size), np.arange(map_size))
+    preX = np.reshape(preX, (map_size, map_size, 1))
+    preY = np.reshape(preY, (map_size, map_size, 1))
+    preXY = np.concatenate((preX, preY), axis = 2)
+    postXY = preXY + forflow
+
+    backflow = np.array([[_get_backf(np.array([x, y]),
+                                     postXY = postXY,
+                                     forflow = forflow)\
+                          for x in np.arange(map_size)]\
+                         for y in np.arange(map_size)])
     return backflow
 
+def _get_backf(xy, postXY, forflow):
+
+    map_size, _, _ = forflow.shape
+    dist_map = np.sqrt((postXY[:, :, 0] - xy[0])**2 + (postXY[:, :, 1] - xy[1])**2)
+
+    # flatten
+    forflow_series = np.reshape(forflow, (map_size**2, 2))
+    dist_series = np.reshape(dist_map, (map_size**2))
+
+    # neighborhood collection
+    idx_near = np.argsort(dist_series)[:4]
+    forflow_near = forflow_series[idx_near]
+    dist_near = dist_series[idx_near] + 1e-4
+
+    w = np.prod(dist_near)/dist_near
+    weight = w/np.sum(w)
+    weight = np.reshape(weight, (4, 1))
+
+    backf = np.sum((weight * forflow_near), axis = 0)
+    return backf
 
     
     
