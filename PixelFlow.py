@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import pdb
+from tqdm import tqdm
 
 # take pre/post frame
 # return pixel flow: shape(ygrid, xgrid, [flow_x,flow_y])
@@ -29,8 +30,6 @@ def PixelFlow(preframe,
 
     return pixelflow
     
-
-
 def PixelSearch(SearchArea, # area for search flow
                 pixels): # objective pixel, and surrounding pixels
 
@@ -49,8 +48,6 @@ def PixelSearch(SearchArea, # area for search flow
     min_idx = min_idx[::-1] + (p_size-1.)/2
     # return pixel movement ([xflow, yflow])
     return min_idx
-
-        
 
 # compare 2 areas
 def PixelLoss(PostArea, PreArea, losstype = 'MSE'):
@@ -250,16 +247,47 @@ def _get_backf(xy, postXY, forflow):
     backf = np.sum((weight * forflow_near), axis = 0)
     return backf
 
+def GetPixelFlow(all_frames,
+                 frameset_size = 2,
+                 search_range = 5,
+                 neighbor_range = 2,
+                 space_smooth_value = 1.5):
     
-    
-    
+    num_frames, frame_size, _ = all_frames.shape
+    framesets = np.array([all_frames[i:i+frameset_size]\
+                          for i in np.arange(num_frames - frameset_size + 1)])
+    if frameset_size > 2:
+        framesets_end = np.array([all_frames[i:i+2]\
+                                  for i in np.arange(num_frames - frameset_size + 1,
+                                                     num_frames - 1)])
+    else:
+        framesets_end = None
 
-    
-    
+    backflow = None
+    print('flow computation start')
+    for i, frames in enumerate(tqdm(framesets)):
+        forflow = get_flow(frames = frames,
+                           search_range = search_range,
+                           neighbor_range = neighbor_range,
+                           init = i==0,
+                           preflow = backflow)
+        forflow = _space_smoother(forflow, theta = space_smooth_value)
+        backflow = get_backflow(forflow = forflow)
 
-    
+        if i == 0:
+            map_size, _, _ = forflow.shape
+            forflows = np.empty((0, map_size, map_size, 2))
+            backflows = np.empty((0, map_size, map_size, 2))
+            
+        forflows = np.append(forflows,
+                             np.reshape(forflow, (1, map_size, map_size, 2)),
+                             axis = 0)
+        backflows = np.append(backflows,
+                              np.reshape(backflow, (1, map_size, map_size, 2)),
+                              axis = 0)
 
+    # if framesets_end is not None:
+    #     for i, frams in enumerate(framesets_end):
+    return forflows, backflows
 
-    
-    
-    
+        
