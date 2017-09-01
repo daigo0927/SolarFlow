@@ -52,8 +52,11 @@ def process(data_dir, d, longitude, latitude,
     
     shade = 1. - crop/np.array(outer)
     print('shade shape {}'.format(shade.shape))
-    
-    pickles_region_path = datepath + '/pickles/' + region
+
+    pickles_path = datepath + '/pickles'
+    if not os.path.isdir(pickles_path):
+        os.mkdir(pickles_path)
+    pickles_region_path = pickles_path + '/' + region
     if not os.path.isdir(pickles_region_path):
         os.mkdir(pickles_region_path)
 
@@ -81,8 +84,8 @@ def main():
                         help = 'objective date, must be [yyyy-mm-dd]')
     parser.add_argument('--time_range', type = int, nargs = 2, default = [9, 18],
                         help = 'processing time range, default [9, 18]')
-    parser.add_argument('--region_name', type = str, nargs = 1, default = 'Tokyo',
-                        help = 'region name, default [Tokyo]')
+    parser.add_argument('--region_name', type = str, required = True,
+                        help = 'region name, like Tokyo')
     args = parser.parse_args()
     
     lon_range = np.array(args.longitude_range)
