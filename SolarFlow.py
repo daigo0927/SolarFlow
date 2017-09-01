@@ -13,6 +13,81 @@ from tqdm import tqdm
 from PixelFlow import PixelFlow
 from PixelInterp import PixelInterp
 
+class easySolarFlow:
+    
+    def __init__(self,
+                 data,
+                 search_range = 5,
+                 neighbor_range = 2):
+
+        self.data = data
+        self.s_range = search_range
+        self.n_range = neighbor_range
+
+        # height/weight of data
+        self.size_origin = data.shape[1]
+        self.size_result = self.size_origin - 2*self.s_range
+
+        self.FramePairs = np.array([[self.data[i], self.data[i+1]]\
+                                    for i in range(len(self.data)-1)])
+
+        self.pool = 0
+
+        self.flows = None
+        self.doubleflows = None
+
+        self.result = None
+
+    def flow(self):
+
+        attr = [[pair[0], pair[1], self.s_range, self.n_range]\
+                for pair in self.FramePairs]
+
+        self.flows = list([pflow(att) for att in tqdm(attr)])
+        
+    def doubleflow(self):
+
+        attr = [[pair[0], pair[1], self.s_range, self.n_range]\
+                for pair in self.FramePairs]
+
+        self.doubleflows = list([biflow(att) for att in tqdm(attr)])
+
+    def interp(self, fineness = 15, method = 'for'):
+
+        print('compute pixel flow ...')
+
+        if method == 'for':
+            self.flow()
+
+            attr = [[pair[0], pair[1], flow, fineness] \
+                    for pair, flow in zip(self.FramePairs, self.flows)]
+
+            print('interpolating ...')
+            result = np.array([pinterp(att) for att in tqdm(attr)])
+            
+        elif method == 'bi':
+            self.doubleflow()
+
+            attr = [[pair[0], pair[1], dflow[0], dflow[1], fineness] \
+                    for pair, dflow in zip(self.FramePairs, self.doubleflows)]
+
+            print('initerpolating ...')
+            result = np.array([biinterp(att) for att in tqdm(attr)])
+                
+        result = result.reshape(result.shape[0] * result.shape[1],
+                                result.shape[2],
+                                result.shape[3])
+
+        # add final frame
+        finalframe = self.data[-1,
+                               self.s_range:self.size_origin-self.s_range,
+                               self.s_range:self.size_origin-self.s_range]
+        finalframe = finalframe.reshape(1, self.size_result, self.size_result)
+        
+        self.result = np.concatenate((result, finalframe), axis = 0)
+
+
+        
 class SolarFlow:
 
     def __init__(self,
