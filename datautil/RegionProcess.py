@@ -9,6 +9,8 @@ import pdb
 import time
 from tqdm import tqdm
 import argparse
+import rpy2
+import rpy2.robjects as robjects
 from glob import glob
 from multiprocessing import Pool
 
@@ -47,30 +49,36 @@ def process(data_dir, d, longitude, latitude,
                                    start_date = d_start,
                                    end_date = d_end,
                                    data_path = Rdatapath)
-    crop = croptotal.Crop()
-    print('crop shape {}'.format(crop.shape))
-    
-    shade = 1. - crop/np.array(outer)
-    print('shade shape {}'.format(shade.shape))
+    try:
+        crop = croptotal.Crop()
+        print('crop shape {}'.format(crop.shape))
+        time_conti = True
+    except rpy2.rinterface.RRuntimeError:
+        time_conti = False
+        print('time discontinuity occurred, skip {}'.format(d))
 
-    pickles_path = datepath + '/pickles'
-    if not os.path.isdir(pickles_path):
-        os.mkdir(pickles_path)
-    pickles_region_path = pickles_path + '/' + region
-    if not os.path.isdir(pickles_region_path):
-        os.mkdir(pickles_region_path)
+    if time_conti:
+        shade = 1. - crop/np.array(outer)
+        print('shade shape {}'.format(shade.shape))
 
-    print('save pickle data ...')
-    with open(pickles_region_path + '/outer.pkl', 'wb') as f:
-        pickle.dump(outer, f)
-    with open(pickles_region_path + '/outer_fine.pkl', 'wb') as f:
-        pickle.dump(outer_fine, f)
-    with open(pickles_region_path + '/crop.pkl', 'wb') as f:
-        pickle.dump(crop, f)
-    with open(pickles_region_path + '/shade.pkl', 'wb') as f:
-        pickle.dump(shade, f)
+        pickles_path = datepath + '/pickles'
+        if not os.path.isdir(pickles_path):
+            os.mkdir(pickles_path)
+        pickles_region_path = pickles_path + '/' + region
+        if not os.path.isdir(pickles_region_path):
+            os.mkdir(pickles_region_path)
 
-    print('{} data process complete'.format(d))
+        print('save pickle data ...')
+        with open(pickles_region_path + '/outer.pkl', 'wb') as f:
+            pickle.dump(outer, f)
+        with open(pickles_region_path + '/outer_fine.pkl', 'wb') as f:
+            pickle.dump(outer_fine, f)
+        with open(pickles_region_path + '/crop.pkl', 'wb') as f:
+            pickle.dump(crop, f)
+        with open(pickles_region_path + '/shade.pkl', 'wb') as f:
+            pickle.dump(shade, f)
+
+        print('{} data process is successfully completed'.format(d))
 
 def main():
     parser = argparse.ArgumentParser()
