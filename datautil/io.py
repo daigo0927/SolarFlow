@@ -1,5 +1,6 @@
 import pickle
 import os
+import numpy as np
 from glob import glob
 
 def load_pickles(path):
@@ -19,3 +20,14 @@ def load_pickles(path):
             data[pkl] = pickle.load(f)
 
     return data
+
+def pad_gdata(gdata):
+
+    (time_length, _) = gdata.shape
+    while time_length%60 != 0:
+        gdata = np.vstack((gdata[0], gdata))
+        (time_length, _) = gdata.shape
+        
+    print('returned data shape : {}'.format(gdata.shape))
+    return gdata
+        
