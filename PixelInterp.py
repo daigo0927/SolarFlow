@@ -7,105 +7,7 @@ import seaborn as sns
 import pickle
 import pdb
 
-from multiprocessing import Pool
 from tqdm import tqdm
-
-from PixelFlow import PixelFlow
-
-class SolarFlow:
-
-    def __init__(self,
-                 data,
-                 SearchRange = 5,
-                 NeighborRange = 2):
-
-        self.data = data
-        self.Srange = SearchRange
-        self.Nrange = NeighborRange
-
-        # height/weight of data
-        self.size_origin = data.shape[1]
-        self.size_result = self.size_origin - 2*self.Srange
-
-        self.FramePairs = np.array([[self.data[i], self.data[i+1]]\
-                                    for i in range(len(self.data)-1)])
-
-        self.pool = None
-
-        self.flows = None
-
-        self.result = None
-
-    def flow(self):
-
-        attr = [[pair[0], pair[1], self.Srange, self.Nrange]\
-                for pair in self.FramePairs]
-
-        if self.pool == 0:
-            self.flows = list([pflow(att) for att in tqdm(attr)])
-        else:
-            self.flows = list(self.pool.map(pflow, attr))
-
-    def interp(self, fineness = 15):
-
-        NumCore = np.int(input('input core number : '))
-        if NumCore == 0:
-            self.pool = 0
-        else:
-            self.pool = Pool(NumCore)
-
-        print('compute pixel flow ...')
-        self.flow()
-
-        attr = [[pair[0], pair[1], flow, fineness] \
-                for pair, flow in zip(self.FramePairs, self.flows)]
-
-        print('interpolating ...')
-        if self.pool == 0:
-            result = np.array([pinterp(att) for att in tqdm(attr)])
-        else:
-            result = np.array(self.pool.map(pinterp, attr))
-            
-        result = result.reshape(result.shape[0] * result.shape[1],
-                                result.shape[2],
-                                result.shape[3])
-
-        # add final frame
-        finalframe = self.data[-1,
-                               self.Srange:self.size_origin-self.Srange,
-                               self.Srange:self.size_origin-self.Srange]
-        finalframe = finalframe.reshape(1, self.size_result, self.size_result)
-        
-        self.result = np.concatenate((result, finalframe), axis = 0)
-
-    def savefig(self, path):
-        pass
-        
-
-        
-def pflow(preframe_postframe_Srange_Nrange):
-
-    preframe, postframe, Srange, Nrange = preframe_postframe_Srange_Nrange
-
-    flow = PixelFlow(preframe = preframe,
-                     postframe = postframe,
-                     SearchRange = Srange,
-                     NeighborRange = Nrange)
-
-    return flow
-
-def pinterp(preframe_postframe_pixelflow_fineness):
-
-    preframe, postframe, pixelflow, fineness = \
-                            preframe_postframe_pixelflow_fineness
-
-    interpolated = PixelInterp(preframe = preframe,
-                               postframe = postframe,
-                               pixelflow = pixelflow,
-                               fineness = fineness)
-
-    return interpolated
-
 
 def PixelInterp(preframe, postframe, pixelflow, fineness):
 
@@ -163,4 +65,89 @@ def PixelInterp(preframe, postframe, pixelflow, fineness):
                 # pdb.set_trace()
 
     return result
+
+
+# new method for smooth flow 10/7 added
     
+def bidirect_interp(preframe, postframe,
+                   forflow, backflow, fineness):
+    tar_size, _, _ = forflow.shape
+    frame_size, _ = preframe.shape
+    rem = int((frame_size - tar_size)/2)
+    
+    for_interp = temp_interp(start_frame = preframe, end_frame = postframe,
+                             flow = forflow, fineness = fineness)
+    back_interp = temp_interp(start_frame = postframe, end_frame = preframe,
+                              flow = -backflow, fineness = fineness)
+
+    result = np.zeros((fineness, tar_size, tar_size))
+    result[0] = preframe[rem:tar_size+rem, rem:tar_size+rem]
+    res = np.array([(1-f/fineness)*for_interp[f] + f/fineness*back_interp[-f]
+                    for f in np.arange(1, fineness)])
+    result[1:] = res
+
+    return result
+
+def temp_interp(start_frame, end_frame, flow, fineness):
+
+    tar_size, _, _ = flow.shape
+    frame_size, _ = start_frame.shape
+    rem = int((frame_size - tar_size)/2)
+
+    # end slice (spatial) interpolation
+    start_p = start_frame[rem:frame_size-rem, rem:frame_size-rem]
+    X, Y = np.meshgrid(np.arange(tar_size), np.arange(tar_size))
+    end_X = X + flow[:, :, 0]
+    end_Y = Y + flow[:, :, 1]
+    end_p = space_interp(target_X = end_X, target_Y = end_Y,
+                         given_p = end_frame)
+
+    # generate inter-slices shape(fineness, tar_size, tar_size)
+    result = np.array([space_interp(
+        target_X = X, target_Y = Y,
+        given_p = (1-f/fineness)*start_p + f/fineness*end_p,
+        given_X = X + (f/fineness) * flow[:, :, 0],
+        given_Y = Y + (f/fineness) * flow[:, :, 1])
+                       for f in np.arange(fineness)])
+    
+    return result
+
+def space_interp(target_X, target_Y, # target position where shade p to be calculated
+                 given_p, given_X = None, given_Y = None): # fixed shade, and position
+    
+    tar_size, _ = target_X.shape
+    given_size, _ = given_p.shape
+    rem = int((given_size - tar_size)/2)
+    if given_X is None and given_Y is None: # end-slice shape(40, 40) processing
+        given_range = np.arange(-rem, given_size-rem)
+        given_X, given_Y = np.meshgrid(given_range, given_range)
+    # else:interpolation process, given_p shape(30, 30)
+    
+    target_p = np.array([[_s_interp(tar_x, tar_y,
+                                    given_p, given_X, given_Y)
+                          for tar_x, tar_y in zip(tar_xx, tar_yy)]
+                         for tar_xx, tar_yy in zip(target_X, target_Y)])
+    return target_p
+
+def _s_interp(tar_x, tar_y,
+              given_p, given_X, given_Y):
+    
+    distmap = np.sqrt((given_X - tar_x)**2 + (given_Y - tar_y)**2)
+
+    given_p_flat = given_p.flatten()
+    dist_flat = distmap.flatten()
+
+    idx_near = np.argsort(dist_flat)[:4]
+    given_p_near = given_p_flat[idx_near]
+    dist_near = dist_flat[idx_near] + 1e-3
+
+    w = np.prod(dist_near)/dist_near
+    weight = w/np.sum(w)
+
+    p_weighted = np.sum(weight * given_p_near)
+
+    return p_weighted
+    
+    
+
+
