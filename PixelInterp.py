@@ -68,9 +68,12 @@ def PixelInterp(preframe, postframe, pixelflow, fineness):
 
 
 # new method for smooth flow 10/7 added
+
+def bidirect_wrapper(args):
+    bidirect_interp(*args)
     
 def bidirect_interp(preframe, postframe,
-                   forflow, backflow, fineness):
+                    forflow, backflow, fineness):
     tar_size, _, _ = forflow.shape
     frame_size, _ = preframe.shape
     rem = int((frame_size - tar_size)/2)
