@@ -44,7 +44,7 @@ class SmoothInterp(object):
 
         args = [(self.data[f], self.data[f+1],
                  self.fflow[f], self.bflow[f], fineness)
-                for f in np.arange(self.num_frames - 1)]
+                for f in np.arange(self.num_frames - (frameset_size - 1))]
 
         if self.pool is not None:
             result = np.array(self.pool.map(bidirect_wrapper, args))
