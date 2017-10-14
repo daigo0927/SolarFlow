@@ -71,7 +71,7 @@ class easySolarFlow:
             attr = [[pair[0], pair[1], dflow[0], dflow[1], fineness] \
                     for pair, dflow in zip(self.FramePairs, self.doubleflows)]
 
-            print('initerpolating ...')
+            print('interpolating ...')
             result = np.array([biinterp(att) for att in tqdm(attr)])
                 
         result = result.reshape(result.shape[0] * result.shape[1],

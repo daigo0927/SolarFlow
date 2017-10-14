@@ -14,42 +14,121 @@ from SolarFlow import SolarFlow, easySolarFlow
 from SmoothFlow import SmoothInterp
 from misc.visualize import draw_cloud
 from misc.utils import LinearInterp
+from datautil.io import load_pickles, pad_gdata
 
 from multiprocessing import Pool
 
 
 def _wrapper(attr):
-    _process(*attr)
+    return _process(*attr)
 
-def _process(pkldir, date, region_name, limit_frame):
+def _process(pkldir, gdata_dir, date, region_name, limit_frame):
 
     print('processing data in {} start'.format(pkldir))
 
     # oroginal shade ratio
-    with open(pkldir + '/shade.pkl', 'rb') as f:
-        data = pickle.load(f)
-    f_origin, w_origin, _ = data.shape
+    data = load_pickles(pkldir)
+    # original total radiation data, shape(limit_frame, 40, 40)
+    if limit_frame == -1:
+        limit_frame = data['crop'].shape[0]
+    tdata = data['crop'][:limit_frame]
+    sdata = data['shade'][:limit_frame]
+    f_origin, w_origin, _ = tdata.shape
+    obj_idx = [19, 20] # ground measurement location
+    # total radiation at objective location, shppe(217, )
+    obj_total = tdata[:limit_frame, obj_idx[1], obj_idx[0]]
+    # outer radiation at objective location, shape(3241, )
+    f_fine = (limit_frame-1)*15+1
+    obj_outer_fine = data['outer_fine'][:f_fine, obj_idx[1], obj_idx[0]]
 
-    # train data, fall every every two slices
-    data_train = data[:limit_frame:2]
+    # load ground data
+    gpath = gdata_dir + '/' + ''.join(date.split('-')) + '_1sec.csv'
+    gdata_origin = pd.read_csv(gpath, header = None)
+    gdata_origin = np.array(gdata_origin)
+    gdata_origin = pad_gdata(gdata_origin)
+    fin_gframe = 32400+(limit_frame-1)*150 # 18h frame
+    gdata = gdata_origin[32399:fin_gframe:150, 1] # 9-18h, every 2.5min, shape(217,)
+    gdata_fine = gdata_origin[32399:fin_gframe:10, 1] # 9-18h, every 10sec shape(3241,)
 
     # experiment setting
     limit_frame = int(limit_frame)
-    s_range = int(7)
+    s_range = int(5)
     n_range = int(2)
-    fine = int(2)
+    fine = int(15)
 
-    result = {}
+    shades = {}
 
-    # linear interp : shape(217, 26, 26)
+    # linear interp : shape(3241, 30, 30)
+    print('linear interpolating')
+    lin = LinearInterp(data = sdata, crop = s_range)
+    lin.interp(fineness = fine)
+    shades['linear'] = lin.result
 
-    return
+    # biflow interp : shape(3241, 30, 30)
+    print('biflow interpolating')
+    easyflow = easySolarFlow(data = sdata,
+                             search_range = s_range,
+                             neighbor_range = n_range)
+    easyflow.interp(fineness = fine, method = 'bi')
+    shades['bi'] = easyflow.result
+    '''
+    # proposed method 1, temporal smoothing : shape(217, 23?, 23?)
+    print('temporal smoothed interpolating ...')
+    t_smooth = SmoothInterp(data = sdata,
+                            search_range = s_range,
+                            neighbor_range = n_range)
+    t_smooth.interp(frameset_size = 3, # <- temporal smoothing
+                    space_smooth_value = 10, fineness = fine)
+    shades['temp_smooth'] = t_smooth.result
+    
+    # proposed method 2, spatial smoothing, and double smoothing : shape(217, 23?, 23?)
+    s_smooth_values = np.array([6., 3., 1.5])
+    labels = ['weak', 'middle', 'strong']
+    for s_value, label in zip(s_smooth_values, labels):
+        s_smooth = SmoothInterp(data = sdata,
+                                search_range = s_range,
+                                neighbor_range = n_range)
+        print('{} spatial smoothed interpolating ...'.format(label))
+        s_smooth.interp(frameset_size = 2,
+                        space_smooth_value = s_value, fineness = fine)
+        shades['space_smooth_{}'.format(label)] = s_smooth.result
+        
+        print('{} double smoothed interpolating ...'.format(label))
+        s_smooth.interp(frameset_size = 3,
+                        space_smooth_value = s_value, fineness = fine)
+        shades['double_smooth_{}'.format(label)] = s_smooth.result
+    '''
+
+    # confirm interpolation results
+    error = np.zeros((f_fine, len(shades.keys())+1))
+    error[:,:] = None
+    colnames = []
+    # original 2.5min total radiation comparing
+    error[::15,0] = ((obj_total - gdata)**2)**(1/2)
+    colnames.append('origin')
+    for i, key in enumerate(shades.keys()):
+        shade = shades[key]
+        f, w, _ = shade.shape
+        drop = int((w_origin - w)/2)
+        obj_shade = shade[:, obj_idx[1]-drop, obj_idx[0]-drop]
+        obj_total_fine = obj_outer_fine[:f]*(1. - obj_shade)
+        error[:len(obj_total_fine), i+1] =\
+                            ((obj_total_fine - gdata_fine[:f])**2)**(1/2)
+        colnames.append(key)
+        
+    error = pd.DataFrame(error)
+    error.columns = colnames
+    print(error.describe())
+        
+    return [region_name+date, error]
     
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type = str, required = True,
-                        help = '/path/to/row_data, contains yyyy-mm-dd')
+    parser.add_argument('--sdata_dir', type = str, required = True,
+                        help = '/path/to/row_data, contains yyyy-mm-dd : satellite')
+    parser.add_argument('--gdata_dir', type = str, required = True,
+                        help = '/path/to/CSV, contains yyyymmdd_1sec.csv : ground')
     parser.add_argument('--date', type = str, nargs = '+', required = True,
                         help = 'objective date, must be [yyyy-mm-dd]')
     parser.add_argument('--region_name', type = str, required = True,
@@ -58,55 +137,22 @@ def main():
                         help = 'number of frames for utilize, default [-1](all)')
     args = parser.parse_args()
 
-    pkldirs = [args.data_dir + '/' + d + '/pickles/' + args.region_name\
+    pkldirs = [args.sdata_dir + '/' + d + '/pickles/' + args.region_name\
                for d in args.date]
-    attrs = [(pkldir, args.date, args.region_name,
-              args.limit_frame) for pkldir in pkldirs]
-    
+    attrs = [(pkldir, args.gdata_dir, d, args.region_name,
+              args.limit_frame) for pkldir, d in zip(pkldirs, args.date)]
+
+    result = {}
     num_cores = int(input('input utilize core number : '))
     pool = Pool(num_cores)
-    results = list(pool.map(_wrapper, attrs))
+    result['error'] = list(pool.map(_wrapper, attrs))
     pool.close()
+    
+    result['config'] = args
 
     with open('./result.pkl', 'wb') as f:
-        pickle.dump(results, f)
+        pickle.dump(result, f)
             
 if __name__ == '__main__':
     main()
-
-
     
-def compare_Himawari_ground(sec_stride = 150):
-
-    # days which has download ground measured solar radiation data
-    days = ['03-25', '03-29', '04-01', '04-05']
-    days_ = [''.join(d.split('-')) for d in days]
-
-    for d, d_ in zip(days, days_):
-        # h:Himawari, g:ground (120th building)
-        hpath = '/Users/Daigo/Data/ShadeRatio/TotalRatioSrc/row_data/2017-{}/pickles/Waseda'.format(d)
-        hdata = load_pickles(hpath)
-        gpath = '~/Data/ShadeRatio/120BuildingData/CSV/2017{}_1sec.csv'.format(d_)
-        gdata = pd.read_csv(gpath, header = None)
-        gdata = pad_gdata(np.array(gdata))
-
-        x = np.linspace(9, 18, 217)
-        x_ = np.linspace(9, 18, 32400/sec_stride+1)
-        plt.title('2017 {}'.format(d), fontsize = 15)
-        plt.xlabel('time', fontsize = 15)
-        plt.ylabel('solar radiation $[W/m^2]$', fontsize = 15)
-        plt.ylim(0, 1200)
-        plt.plot(x, hdata['crop'][:, 19, 20], label = 'Himawari (total)')
-        plt.plot(x, hdata['outer'][:, 19, 20], label = 'Himawari (outer)')
-        plt.plot(x, gdata[32399:64800:sec_stride, 1], label = '120th Building')
-        plt.legend(fontsize = 14)
-        plt.savefig('./result/{}compare.png'.format(d))
-        plt.close()
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--sec_stride', type = int, default = 150,
-                        help = 'second stride for plot each slices of ground data')
-    args = parser.parse_args()
-
-    compare_Himawari_ground(**vars(args))

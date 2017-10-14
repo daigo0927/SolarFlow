@@ -31,7 +31,10 @@ def _process(pkldir, date, region_name, limit_frame):
     f_origin, w_origin, _ = data.shape
 
     # train data, fall every every two slices
-    data_train = data[:limit_frame:2]
+    if limit_frame == -1:
+        data_train = data[::2]
+    else:
+        data_train = data[:limit_frame:2]
 
     # experiment setting
     limit_frame = int(limit_frame)
@@ -105,7 +108,7 @@ def _process(pkldir, date, region_name, limit_frame):
     error.columns = colnames
     print(error.describe())
 
-    return error
+    return [region_name+date, error]
     
 
 def main():
@@ -124,15 +127,14 @@ def main():
                for d in args.date]
     attrs = [(pkldir, d, args.region_name,
               args.limit_frame) for pkldir, d in zip(pkldirs, args.date)]
-    
+
+    result = {}
     num_cores = int(input('input utilize core number : '))
     pool = Pool(num_cores)
-    res_tmp = list(pool.map(_wrapper, attrs))
+    result['error'] = list(pool.map(_wrapper, attrs))
     pool.close()
 
-    results = {}
-    for res, d in zip(res_tmp, args.date):
-        results['{}{}'.format(args.region_name, d)] = res
+    result['config'] = args
 
     with open('./result.pkl', 'wb') as f:
         pickle.dump(results, f)
