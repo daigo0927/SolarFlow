@@ -9,6 +9,7 @@ import argparse
 import pdb
 
 from tqdm import tqdm
+from collections import OrderedDict
 
 from SolarFlow import SolarFlow, easySolarFlow
 from SmoothFlow import SmoothInterp
@@ -56,7 +57,7 @@ def _process(pkldir, gdata_dir, date, region_name, limit_frame):
     n_range = int(2)
     fine = int(15)
 
-    shades = {}
+    shades = OrderedDict()
 
     # linear interp : shape(3241, 30, 30)
     print('linear interpolating')
@@ -71,7 +72,7 @@ def _process(pkldir, gdata_dir, date, region_name, limit_frame):
                              neighbor_range = n_range)
     easyflow.interp(fineness = fine, method = 'bi')
     shades['bi'] = easyflow.result
-    '''
+
     # proposed method 1, temporal smoothing : shape(217, 23?, 23?)
     print('temporal smoothed interpolating ...')
     t_smooth = SmoothInterp(data = sdata,
@@ -97,7 +98,7 @@ def _process(pkldir, gdata_dir, date, region_name, limit_frame):
         s_smooth.interp(frameset_size = 3,
                         space_smooth_value = s_value, fineness = fine)
         shades['double_smooth_{}'.format(label)] = s_smooth.result
-    '''
+
 
     # confirm interpolation results
     error = np.zeros((f_fine, len(shades.keys())+1))
@@ -142,7 +143,7 @@ def main():
     attrs = [(pkldir, args.gdata_dir, d, args.region_name,
               args.limit_frame) for pkldir, d in zip(pkldirs, args.date)]
 
-    result = {}
+    result = OrderedDict()
     num_cores = int(input('input utilize core number : '))
     pool = Pool(num_cores)
     result['error'] = list(pool.map(_wrapper, attrs))

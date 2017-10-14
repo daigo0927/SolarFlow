@@ -9,6 +9,7 @@ import argparse
 import pdb
 
 from tqdm import tqdm
+from collections import OrderedDict
 
 from SolarFlow import SolarFlow, easySolarFlow
 from SmoothFlow import SmoothInterp
@@ -42,7 +43,7 @@ def _process(pkldir, date, region_name, limit_frame):
     n_range = int(2)
     fine = int(2)
 
-    result = {}
+    result = OrderedDict()
 
     # linear interp : shape(217, 26, 26)
     print('linear interpolating ...')
@@ -128,7 +129,7 @@ def main():
     attrs = [(pkldir, d, args.region_name,
               args.limit_frame) for pkldir, d in zip(pkldirs, args.date)]
 
-    result = {}
+    result = OrderedDict()
     num_cores = int(input('input utilize core number : '))
     pool = Pool(num_cores)
     result['error'] = list(pool.map(_wrapper, attrs))
