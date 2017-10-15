@@ -138,7 +138,7 @@ def main():
     result['config'] = args
 
     with open('./result.pkl', 'wb') as f:
-        pickle.dump(results, f)
+        pickle.dump(result, f)
             
 if __name__ == '__main__':
     main()
