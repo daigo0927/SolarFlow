@@ -98,8 +98,17 @@ def draw_fusioncloud(cloud_origin, cloud_fine, method = ''):
                 cmap = 'YlGnBu_r', annot = False)
     plt.title('{} interp origin/interp'.format(method))
 
-                         
-                         
+def visResult(result):
+    
+    cols = ['coral', 'grey', 'grey', 'royalblue',
+            'yellow', 'lime', 'yellow', 'lime', 'yellow', 'lime']
+    sns.set_pallete(cols)
+    plt.ylim(0, 600)
+    plt.ylabel('radiation error $[W/m^2]$', fontsize = 14)
+    plt.title(result['error'][0][0])
+    sns.boxplot(data = result['error'][0][1])
+    # plt.savefig('./result.pdf')
+    plt.show()
 
     
 
