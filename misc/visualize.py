@@ -125,7 +125,7 @@ def visResult(result):
 
 
 # flow field plausiblity
-def vis_flowfield(flowfield, theta, check_dim, margin = 5, figname = 'tmp', delay = 1000):
+def vis_flowfield(flowfield, theta, check_dim, margin = 5, figname = 'tmp', delay = 100):
 
     print('flow field checking ...')
     # 1:normal, 0:strange
@@ -150,10 +150,9 @@ def vis_flowfield(flowfield, theta, check_dim, margin = 5, figname = 'tmp', dela
         plt.savefig(figname + str(i).zfill(3) + '.png')
         
     print('Figure outputs completed! Making gif images.')
-    os.system('convert {0}*.png -delay 1000 {0}.gif'.format(figname, delay))
+    os.system('convert -delay {0} {1}*.png {1}.gif'.format(delay, figname))
     os.system('rm {}*.png'.format(figname))
     print('Gif image saved.')
-    
 
 def _checkfield(flowfield, theta, check_dim):
 
