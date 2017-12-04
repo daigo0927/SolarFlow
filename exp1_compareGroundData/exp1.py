@@ -20,8 +20,11 @@ def compare_Himawari_ground(sec_stride = 150):
         hpath = '/Users/Daigo/Data/ShadeRatio/TotalRatioSrc/row_data/2017-{}/pickles/Waseda'.format(d)
         hdata = load_pickles(hpath)
         gpath = '~/Data/ShadeRatio/120BuildingData/CSV/2017{}_1sec.csv'.format(d_)
-        gdata = pd.read_csv(gpath, header = None)
-        gdata = pad_gdata(np.array(gdata))
+        processer = gdata_preprocesser(gpath)
+        gdata = processer.move_avg(step = sec_stride)
+        # gdata_fine = processser.move_avg(10)
+        # gdata = pd.read_csv(gpath, header = None)
+        # gdata = pad_gdata(np.array(gdata))
 
         x = np.linspace(9, 18, 217)
         x_ = np.linspace(9, 18, 32400/sec_stride+1)
@@ -31,9 +34,9 @@ def compare_Himawari_ground(sec_stride = 150):
         plt.ylim(0, 1200)
         plt.plot(x, hdata['crop'][:, 19, 20], label = 'Himawari (total)')
         plt.plot(x, hdata['outer'][:, 19, 20], label = 'Himawari (outer)')
-        plt.plot(x, gdata[32399:64800:sec_stride, 1], label = '120th Building')
+        plt.plot(x, gdata, label = '120th Building')
         plt.legend(fontsize = 14)
-        plt.savefig('./result/{}compare.png'.format(d))
+        plt.savefig('./result/{}compare.pdf'.format(d))
         plt.close()
 
 if __name__ == '__main__':
