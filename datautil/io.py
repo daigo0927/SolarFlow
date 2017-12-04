@@ -2,6 +2,7 @@ import pickle
 import os
 import numpy as np
 from glob import glob
+import pandas as pd
 
 def load_pickles(path):
     
@@ -30,4 +31,18 @@ def pad_gdata(gdata):
         
     print('returned data shape : {}'.format(gdata.shape))
     return gdata
+
+class gdata_preprocesser(object):
+
+    def __init__(self, gpath):
+        gdata_origin_ = np.array(pd.read_csv(gpath, header = None))
+        self.gdata_origin = pad_gdata(gdata_origin_)
+
+    def move_avg(self, limit_frame = 217, step = 150):
+        fin_gframe = 32400+(limit_frame-1)*150 # mainly 18h frame
+
+        radius = int(step/2)
+        gdata = np.array([np.mean(self.gdata_origin[i-radius:i+radius, 1])
+                          for i in np.arange(32399, fin_gframe, step)])
+        return gdata
         
