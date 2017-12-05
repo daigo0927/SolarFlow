@@ -124,6 +124,20 @@ def visResult(result):
     plt.show()
 
 
+# cloud gif maker
+def vis_clouddynamics(fields, color = 'YlGnBu_r', figname = 'tmp', delay = 100):
+
+    for i, field in enumerate(tqdm(fields)):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        sns.heatmap(field, cmap = color, vmin = 0., vmax = 1.)
+        plt.savefig(figname + str(i).zfill(3) + '.png')
+
+    print('Figure outputs completed! Making gif images.')
+    os.system('convert -delay {0} {1}*.png {1}.gif'.format(delay, figname))
+    os.system('rm {}*.png'.format(figname))
+    print('Gif image saved.')
+    
 # flow field plausiblity
 def vis_flowfield(flowfield, theta, check_dim, margin = 5, figname = 'tmp', delay = 100):
 
