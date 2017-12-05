@@ -230,6 +230,16 @@ class VectorOptimizer(object):
                                          for l in loss]\
                                         for loss in loss_frame]\
                                        for loss_frame in self.loss_concat])
+        return self.vec_field, self.loss
+            
+    @property
+    def loss(self):
+        coef = np.reshape(self.coef, (-1, 1, 1))
+        loss_field = np.array([[[np.min(np.sum(l*coef, axis = 0))
+                                 for l in loss]\
+                                for loss in loss_frame]\
+                               for loss_frame in self.loss_concat])
+        return loss_field
 
     def _concat(self, reg_s, reg_t, reg_ts):
         reg_s = np.reshape(reg_s,
