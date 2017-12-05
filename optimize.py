@@ -3,7 +3,7 @@ import numpy as np
 from hyperopt import hp, tpe, Trials, fmin
 from SmoothFlow_Vreg import VectorOptimizer
 
-def 
+
 
 def opt_hyper(fullframes,
               n_range = 2, s_range = 5,
