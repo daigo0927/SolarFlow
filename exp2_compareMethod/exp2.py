@@ -12,9 +12,10 @@ from tqdm import tqdm
 from collections import OrderedDict
 
 from SolarFlow import SolarFlow, easySolarFlow
-from SmoothFlow import SmoothInterp
+from optimize import opt_hyper
 from misc.visualize import draw_cloud
 from misc.utils import LinearInterp
+from datautil.io import load_pickles
 
 from multiprocessing import Pool
 
@@ -26,16 +27,16 @@ def _process(pkldir, date, region_name, limit_frame):
 
     print('processing data in {} start'.format(pkldir))
 
-    # oroginal shade ratio
-    with open(pkldir + '/shade.pkl', 'rb') as f:
-        data = pickle.load(f)
+    data = load_pickles(pkldir)
+    
     f_origin, w_origin, _ = data.shape
 
     # train data, fall every every two slices
-    if limit_frame == -1:
-        data_train = data[::2]
-    else:
-        data_train = data[:limit_frame:2]
+    if limit_frame%2 == 0:
+        raise ValueError('limitframes must be odd number')
+    for key in ['shade', 'crop', 'outer']:
+        data[key] = np.array(data[key])[:limit_frame]
+    
 
     # experiment setting
     limit_frame = int(limit_frame)
@@ -51,13 +52,6 @@ def _process(pkldir, date, region_name, limit_frame):
     lin.interp(fineness = fine)
     result['linear'] = lin.result
     
-    # previously proposed biflow interp : shape(217, 26, 26)
-    print('biflow interpolating ...')
-    easyflow = easySolarFlow(data = data_train,
-                             search_range = s_range,
-                             neighbor_range = n_range)
-    easyflow.interp(fineness = fine, method = 'bi')
-    result['bi'] = easyflow.result
     
     # proposed method 1, temporal smoothing : shape(217, 23?, 23?)
     print('temporal smoothed interpolating ...')
@@ -110,7 +104,7 @@ def _process(pkldir, date, region_name, limit_frame):
     print(error.describe())
 
     return [region_name+date, error]
-    
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -120,7 +114,7 @@ def main():
                         help = 'objective date, must be [yyyy-mm-dd]')
     parser.add_argument('--region_name', type = str, required = True,
                         help = 'region name, under /row_data/yyyy-mm-dd/pickles, like Tokyo')
-    parser.add_argument('--limit_frame', type = int, default = -1,
+    parser.add_argument('--limit_frame', type = int, default = 999,
                         help = 'number of frames for utilize, default [-1](all)')
     args = parser.parse_args()
 

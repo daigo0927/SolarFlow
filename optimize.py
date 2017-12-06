@@ -3,6 +3,7 @@ import numpy as np
 from hyperopt import hp, tpe, Trials, fmin
 from SmoothFlow_Vreg import smoothflow_withVreg
 from SmoothInterp import fullinterp
+from misc.utils import LinearInterp
 
 def opt_hyper(data,
               limit_frame = 999,
@@ -43,7 +44,7 @@ def opt_hyper(data,
         
         _, frame_size, _ = shade_reconst.shape
         rem = int((frame_size_origin - frame_size)/2)
-        # crop and adjust for the interpolated result
+        # crop and adjust for the shape of interpolated result
         outer_ = data['outer'][:, rem:frame_size+rem, rem:frame_size+rem]
         total_reconst = (1 - shade_reconst)*outer_
         total_ = data['crop'][:, rem:frame_size+rem, rem:frame_size+rem]
@@ -65,4 +66,103 @@ def opt_hyper(data,
 def _makecoef(k1 = 0, k2 = 0, k3 = 0):
     return np.array([1, k1, k2, k3])
 
+# interpolation class, integrate methods
+# validation:True is the one-drop validation
+class Interpolater(object):
 
+    def __init__(self, data, limit_frame = 999, validation = False, fineness = 15):
+        
+        self.data = {}
+        self.data['crop'] = data['crop'][:limit_frame]
+        self.data['outer'] = np.array(data['outer'])[:limit_frame]
+        self.data['outer_fine'] = np.array(data['outer_fine'])[:(limit_frame-1)*15+1]
+        self.data['shade'] = data['shade'][:limit_frame]
+
+        self.validation = validation
+        if self.validation:
+            if limit_frame%2 == 0:
+                raise ValueError('limit_frame must be odd number when validation')
+            self.n_range = 2
+            self.s_range = 7
+            self.fineness = 2
+            self.shade = self.data['shade'][::2]
+            self.outer_fine = self.data['outer']
+        else:
+            self.n_range = 2
+            self.s_range = 5
+            assert 15%fineness == 0, 'fineness should be a divisor number of 15'
+            self.fineness = fineness
+            self.shade = self.data['shade']
+            self.outer_fine = self.data['outer_fine'][::int(15/fineness)]
+
+    def linear_interp(self):
+        lin = LinearInterp(data = self.shade)
+        lin.interp(fineness = self.fineness)
+        shade_fine = lin.result
+        total_fine = (1 - shade_fine)*self.outer_fine
+        return total_fine
+
+    def flow_interp(self):
+        forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
+                                                coef = np.array([1., 0., 0., 0.]),
+                                                neighbor_range = self.n_range,
+                                                search_range = self.s_range)
+        shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
+        total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
+        return total_fine
+        
+    def flow_interp_doubleregs(self, max_evals):
+        # get the best hyper parameter
+        best_hyperparams, _ = opt_hyper(self.data, max_evals = max_evals, st_reg = False)
+        k1 = best_hyperparams['spatial']
+        k2 = best_hyperparams['temporal']
+        forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
+                                                coef = np.array([1., k1, k2, 0.]),
+                                                neighbor_range = self.n_range,
+                                                search_range = self.s_range)
+        shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
+        total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
+        return total_fine
+
+    def flow_interp_tripleregs(self, max_evals):
+        # get the best hyper parameter
+        best_hyperparams, _ = opt_hyper(self.data, max_evals = max_evals, st_reg = True)
+        k1 = best_hyperparams['spatial']
+        k2 = best_hyperparams['temporal']
+        k3 = best_hyperparams['spatiotemporal']
+        forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
+                                                coef = np.array([1., k1, k2, k3]),
+                                                neighbor_range = self.n_range,
+                                                search_range = self.s_range)
+        shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
+        total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
+        return total_fine
+
+# crop and make target_attay have same shape of shape_array
+def croparray(target_array, shape_array):
+
+    num_frames, frame_size_origin, _ = target_array.shape
+    num_frames_, frame_size, _ = shape_array.shape
+    assert num_frames == num_frames, 'given array have invalid num_frames'
+
+    rem = int((frame_size_origin - frame_size)/2)
+    return target_array[:, rem:frame_size+rem, rem:frame_size+rem]
+
+def doubleflow_withVreg(fullframes,
+                        coef,
+                        num_iter = 5,
+                        neighbor_range = 2,
+                        search_range = 5,
+                        losstype = 'MSE'):
+    
+    forflow = smoothflow_withVreg(fullframes = fullframes,
+                                  coef = coef,
+                                  neighbor_range = neighbor_range,
+                                  search_range = search_range,
+                                  losstype = losstype)
+    backflow = smoothflow_withVreg(fullframes = fullframes[::-1],
+                                   coef = coef,
+                                   neighbor_range = neighbor_range,
+                                   search_range = search_range,
+                                   losstype = losstype)
+    return forflow, backflow
