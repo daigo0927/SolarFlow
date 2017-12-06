@@ -48,7 +48,7 @@ def opt_hyper(data,
         total_reconst = (1 - shade_reconst)*outer_
         total_ = data['crop'][:, rem:frame_size+rem, rem:frame_size+rem]
         
-        return np.mean((total_reconst - total_)**2)
+        return np.mean(np.sqrt((total_reconst - total_)**2))
 
     trials = Trials()
     best = fmin(
