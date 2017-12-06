@@ -11,7 +11,7 @@ from PixelFlow import PixelFlow
 
 def visflow(flow, margin = 5):
 
-    y_len, x_len = flow.shape
+    y_len, x_len, _ = flow.shape
     X, Y = np.meshgrid(range(x_len), range(y_len))
 
     fig = sns.plt.figure()
