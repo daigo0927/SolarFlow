@@ -70,7 +70,9 @@ def _makecoef(k1 = 0, k2 = 0, k3 = 0):
 # validation:True is the one-drop validation
 class Interpolater(object):
 
-    def __init__(self, data, limit_frame = 999, validation = False, fineness = 15):
+    def __init__(self, data, limit_frame = 999, validation = None, fineness = 15):
+
+        limit_frame = min(len(data['crop']), limit_frame)
         
         self.data = {}
         self.data['crop'] = data['crop'][:limit_frame]
@@ -79,13 +81,13 @@ class Interpolater(object):
         self.data['shade'] = data['shade'][:limit_frame]
 
         self.validation = validation
-        if self.validation:
-            if limit_frame%2 == 0:
-                raise ValueError('limit_frame must be odd number when validation')
+        if self.validation is not None:
+            if (limit_frame-1)%self.validation != 0:
+                raise ValueError('limit_frame must be adjust to validation number')
             self.n_range = 2
-            self.s_range = 7
-            self.fineness = 2
-            self.shade = self.data['shade'][::2]
+            self.s_range = 5+2*(self.validation-1)
+            self.fineness = self.validation
+            self.shade = self.data['shade'][:limit_frame:self.validation]
             self.outer_fine = self.data['outer']
         else:
             self.n_range = 2

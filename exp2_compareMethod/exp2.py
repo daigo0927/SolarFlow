@@ -11,92 +11,40 @@ import pdb
 from tqdm import tqdm
 from collections import OrderedDict
 
-from SolarFlow import SolarFlow, easySolarFlow
-from optimize import opt_hyper
+from optimize import Interpolater, croparray
 from misc.visualize import draw_cloud
-from misc.utils import LinearInterp
 from datautil.io import load_pickles
 
 from multiprocessing import Pool
 
-
 def _wrapper(attr):
     return _process(*attr)
 
-def _process(pkldir, date, region_name, limit_frame):
+def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
 
     print('processing data in {} start'.format(pkldir))
-
     data = load_pickles(pkldir)
     
-    f_origin, w_origin, _ = data.shape
-
-    # train data, fall every every two slices
-    if limit_frame%2 == 0:
-        raise ValueError('limitframes must be odd number')
-    for key in ['shade', 'crop', 'outer']:
-        data[key] = np.array(data[key])[:limit_frame]
-    
-
-    # experiment setting
-    limit_frame = int(limit_frame)
-    s_range = int(7)
-    n_range = int(2)
-    fine = int(2)
-
     result = OrderedDict()
-
-    # linear interp : shape(217, 26, 26)
-    print('linear interpolating ...')
-    lin = LinearInterp(data = data_train, crop = s_range)
-    lin.interp(fineness = fine)
-    result['linear'] = lin.result
+    # reconstructed global solar radiation
+    inter = Interpolater(data = data, limit_frame = limit_frame, validation = validation)
+    result['linear'] = inter.linear_interp()
+    result['normal'] = inter.flow_interp()
+    result['double'] = inter.flow_interp_doubleregs(max_evals = max_evals)
+    result['triple'] = inter.flow_interp_tripleregs(max_evals = max_evals)
     
-    
-    # proposed method 1, temporal smoothing : shape(217, 23?, 23?)
-    print('temporal smoothed interpolating ...')
-    t_smooth = SmoothInterp(data = data_train,
-                            search_range = s_range,
-                            neighbor_range = n_range)
-    t_smooth.interp(frameset_size = 3, # <- temporal smoothing
-                    space_smooth_value = 10, fineness = fine)
-    result['temp_smooth'] = t_smooth.result
-
-    # proposed method 2, spatial smoothing, and double smoothing : shape(217, 23?, 23?)
-    s_smooth_values = np.array([6., 3., 1.5])
-    labels = ['weak', 'middle', 'strong']
-    for s_value, label in zip(s_smooth_values, labels):
-        s_smooth = SmoothInterp(data = data_train,
-                                search_range = s_range,
-                                neighbor_range = n_range)
-        print('{} spatial smoothed interpolating ...'.format(label))
-        s_smooth.interp(frameset_size = 2,
-                        space_smooth_value = s_value, fineness = fine)
-        result['space_smooth_{}'.format(label)] = s_smooth.result
-
-        print('{} double smoothed interpolating ...'.format(label))
-        s_smooth.interp(frameset_size = 3,
-                        space_smooth_value = s_value, fineness = fine)
-        result['double_smooth_{}'.format(label)] = s_smooth.result
-
     # confirm interpolated slices
-    f_min, w_min, _ = result['temp_smooth'].shape
-    f_test_idx = np.arange(1, f_min, 2)
-    error = np.zeros((len(f_test_idx), len(result.keys())))
+    train_idx = np.arange(0, limit_frame, validation)
+    val_idx = True^np.array([i in train_idx for i in np.arange(limit_frame)])
+    error = np.zeros((len(result['triple'][val_idx].flatten()), len(result.keys())))
     colnames = []
     print('interpolation results testing ...')
-    for i, key in enumerate(result.keys()):
-        res = result[key]
-        f, w, _ = res.shape
-        drop = int((w - w_min)/2)
-        drop_origin = int((w_origin - w_min)/2)
-        err = data[f_test_idx,
-                   drop_origin:w_min+drop_origin,
-                   drop_origin:w_min+drop_origin]\
-              - res[f_test_idx, drop:w_min+drop, drop:w_min+drop]
-        err = np.mean(err**2, axis = (1,2)) # shape(f_min, )
-        
-        error[:, i] = err
+    for i, (key, res) in enumerate(result.items()):
+        crop_ = croparray(inter.data['crop'], result['triple'])
+        res_ = croparray(res, result['triple'])
+        diff = np.sqrt((crop_ - res_)**2)
+                
+        error[:, i] = diff[val_idx].flatten()
         colnames.append(key)
 
     error = pd.DataFrame(error)
@@ -115,19 +63,28 @@ def main():
     parser.add_argument('--region_name', type = str, required = True,
                         help = 'region name, under /row_data/yyyy-mm-dd/pickles, like Tokyo')
     parser.add_argument('--limit_frame', type = int, default = 999,
-                        help = 'number of frames for utilize, default [-1](all)')
+                        help = 'number of frames for utilize, default [999](all)')
+    parser.add_argument('--max_evals', type = int, default = 50,
+                        help = 'number of max evaluation in hyperopt [50]')
+    parser.add_argument('--validation', type = int, default = 2,
+                        help = 'number of validation fold [2]')
     args = parser.parse_args()
 
     pkldirs = [args.data_dir + '/' + d + '/pickles/' + args.region_name\
                for d in args.date]
     attrs = [(pkldir, d, args.region_name,
-              args.limit_frame) for pkldir, d in zip(pkldirs, args.date)]
+              args.limit_frame, args.max_evals, args.validation)
+             for pkldir, d in zip(pkldirs, args.date)]
 
     result = OrderedDict()
+
     num_cores = int(input('input utilize core number : '))
-    pool = Pool(num_cores)
-    result['error'] = list(pool.map(_wrapper, attrs))
-    pool.close()
+    if num_cores <= 1:
+        result['error'] = [_wrapper(attr) for attr in attrs]
+    else:
+        pool = Pool(num_cores)
+        result['error'] = list(pool.map(_wrapper, attrs))
+        pool.close()
 
     result['config'] = args
 
