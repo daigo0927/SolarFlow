@@ -34,6 +34,7 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     result['triple'] = inter.flow_interp_tripleregs(max_evals = max_evals)
     
     # confirm interpolated slices
+    limit_frame = min(len(data['crop']), limit_frame)
     train_idx = np.arange(0, limit_frame, validation)
     val_idx = True^np.array([i in train_idx for i in np.arange(limit_frame)])
     error = np.zeros((len(result['triple'][val_idx].flatten()), len(result.keys())))
