@@ -12,7 +12,7 @@ import pdb
 from tqdm import tqdm
 from collections import OrderedDict
 
-from optimize import VectorOptimizer
+from SmoothFlow_Vreg import VectorOptimizer, reg_all, get_vector
 from datautil.io import load_pickles
 
 from multiprocessing import Pool
@@ -78,14 +78,14 @@ def main():
                         help = 'number of frames for utilize, default [999](all)')
     parser.add_argument('--num_iter', type = int, default = 10,
                         help = 'optimize iteration [10]')
-    parser.add_argument('--coef', type = int, nargs = 3, required = True,
+    parser.add_argument('--coef', type = float, nargs = 3, required = True,
                         help = 'three regularizer coefficients, like [0.01, 0.01, 0.005]')
     args = parser.parse_args()
 
     pkldirs = [args.data_dir + '/' + d + '/pickles/' + args.region_name\
                for d in args.date]
     attrs = [(pkldir, d, args.region_name,
-              args.limit_frame, args.num_iter, args.coef)
+              args.limit_frame, args.num_iter, [1.] + args.coef)
              for pkldir, d in zip(pkldirs, args.date)]
 
     result = OrderedDict()
