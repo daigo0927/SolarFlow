@@ -30,8 +30,8 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     inter = Interpolater(data = data, limit_frame = limit_frame, validation = validation)
     result['linear'] = inter.linear_interp()
     result['normal'] = inter.flow_interp()
-    result['double'] = inter.flow_interp_doubleregs(max_evals = max_evals)
-    result['triple'] = inter.flow_interp_tripleregs(max_evals = max_evals)
+    result['double'], hparams_d = inter.flow_interp_doubleregs(max_evals = max_evals)
+    result['triple'], hparams_t = inter.flow_interp_tripleregs(max_evals = max_evals)
     
     # confirm interpolated slices
     limit_frame = min(len(data['crop']), limit_frame)
@@ -52,7 +52,8 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     error.columns = colnames
     print(error.describe())
 
-    return [region_name+date, error]
+    return {'date':region_name+date, 'error':error,
+            'hparams_double':hparams_d, 'hparams_triple':hparams_t}
 
 
 def main():

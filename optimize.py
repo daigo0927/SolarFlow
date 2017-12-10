@@ -124,7 +124,7 @@ class Interpolater(object):
                                                 search_range = self.s_range)
         shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
         total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
-        return total_fine
+        return total_fine, np.array([1., k1, k2, 0.])
 
     def flow_interp_tripleregs(self, max_evals):
         # get the best hyper parameter
@@ -138,7 +138,7 @@ class Interpolater(object):
                                                 search_range = self.s_range)
         shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
         total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
-        return total_fine
+        return total_fine, np.array([1., k1, k2, k3])
 
 # crop and make target_attay have same shape of shape_array
 def croparray(target_array, shape_array):
