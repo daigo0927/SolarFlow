@@ -44,9 +44,15 @@ def _search(area, search_area, losstype):
 def _match(prearea, postarea, losstype):
     if losstype == 'MSE':
         l = np.sqrt((postarea - prearea)**2)
+        return np.mean(l)
+    elif losstype == 'NCC':
+        prenorm = np.sqrt(np.sum(prearea**2))
+        postnorm = np.sqrt(np.sum(postarea**2))
+        l = np.sum(postarea * prearea)/prenorm/postnorm
+        return -l
     else:
         raise ValueError('losstype {} is not available'.format(losstype))
-    return np.mean(l)
+    
 # ---------------------------------area mathing loss
 
 
