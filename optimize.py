@@ -116,7 +116,7 @@ class Interpolater(object):
         
     def flow_interp_doubleregs(self, losstype, max_evals):
         # get the best hyper parameter
-        best_hyperparams, _ = opt_hyper(self.data, losstype = losstype
+        best_hyperparams, _ = opt_hyper(self.data, losstype = losstype,
                                         max_evals = max_evals, st_reg = False)
         k1 = best_hyperparams['spatial']
         k2 = best_hyperparams['temporal']
