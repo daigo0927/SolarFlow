@@ -11,11 +11,9 @@ import pdb
 from tqdm import tqdm
 from collections import OrderedDict
 
-from SolarFlow import SolarFlow, easySolarFlow
-from SmoothFlow import SmoothInterp
 from misc.visualize import draw_cloud
-from misc.utils import LinearInterp
-from datautil.io import load_pickles, pad_gdata
+from optimize import Interpolater
+from datautil.io import load_pickles, gdata_preprocesser
 
 from multiprocessing import Pool
 
