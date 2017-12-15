@@ -29,20 +29,27 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     # reconstructed global solar radiation
     inter = Interpolater(data = data, limit_frame = limit_frame, validation = validation)
     result['linear'] = inter.linear_interp()
-    result['normal'] = inter.flow_interp()
-    result['double'], hparams_d = inter.flow_interp_doubleregs(max_evals = max_evals)
-    result['triple'], hparams_t = inter.flow_interp_tripleregs(max_evals = max_evals)
+    result['normal_MSE'] = inter.flow_interp(losstype = 'MSE')
+    result['normal_NCC'] = inter.flow_interp(losstype = 'NCC')
+    result['double_MSE'], hparams_d_MSE = inter.flow_interp_doubleregs(losstype = 'MSE',
+                                                                       max_evals = max_evals)
+    result['double_NCC'], hparams_d_NCC = inter.flow_interp_doubleregs(losstype = 'NCC',
+                                                                       max_evals = max_evals)
+    result['triple_MSE'], hparams_t_MSE = inter.flow_interp_tripleregs(losstype = 'MSE',
+                                                                       max_evals = max_evals)
+    result['triple_NCC'], hparams_t_NCC = inter.flow_interp_tripleregs(losstype = 'NCC',
+                                                                       max_evals = max_evals)
     
     # confirm interpolated slices
     limit_frame = min(len(data['crop']), limit_frame)
     train_idx = np.arange(0, limit_frame, validation)
     val_idx = True^np.array([i in train_idx for i in np.arange(limit_frame)])
-    error = np.zeros((len(result['triple'][val_idx].flatten()), len(result.keys())))
+    error = np.zeros((len(result['triple_MSE'][val_idx].flatten()), len(result.keys())))
     colnames = []
     print('interpolation results testing ...')
     for i, (key, res) in enumerate(result.items()):
-        crop_ = croparray(inter.data['crop'], result['triple'])
-        res_ = croparray(res, result['triple'])
+        crop_ = croparray(inter.data['crop'], result['triple_MSE'])
+        res_ = croparray(res, result['triple_MSE'])
         diff = np.sqrt((crop_ - res_)**2)
                 
         error[:, i] = diff[val_idx].flatten()
@@ -53,7 +60,8 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     print(error.describe())
 
     return {'date':region_name+date, 'error':error,
-            'hparams_double':hparams_d, 'hparams_triple':hparams_t}
+            'hparams_d_MSE':hparams_d_MSE, 'hparams_d_NCC':hparams_d_NCC,
+            'hparams_t_MSE':hparams_t_MSE, 'hparams_t_NCC':hparams_t_NCC}
 
 
 def main():

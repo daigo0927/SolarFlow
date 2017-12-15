@@ -104,38 +104,43 @@ class Interpolater(object):
         total_fine = (1 - shade_fine)*self.outer_fine
         return total_fine
 
-    def flow_interp(self):
+    def flow_interp(self, losstype):
         forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
                                                 coef = np.array([1., 0., 0., 0.]),
                                                 neighbor_range = self.n_range,
-                                                search_range = self.s_range)
+                                                search_range = self.s_range,
+                                                losstype = losstype)
         shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
         total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
         return total_fine
         
-    def flow_interp_doubleregs(self, max_evals):
+    def flow_interp_doubleregs(self, losstype, max_evals):
         # get the best hyper parameter
-        best_hyperparams, _ = opt_hyper(self.data, max_evals = max_evals, st_reg = False)
+        best_hyperparams, _ = opt_hyper(self.data, losstype = losstype
+                                        max_evals = max_evals, st_reg = False)
         k1 = best_hyperparams['spatial']
         k2 = best_hyperparams['temporal']
         forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
                                                 coef = np.array([1., k1, k2, 0.]),
                                                 neighbor_range = self.n_range,
-                                                search_range = self.s_range)
+                                                search_range = self.s_range,
+                                                losstype = losstype)
         shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
         total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
         return total_fine, np.array([1., k1, k2, 0.])
 
-    def flow_interp_tripleregs(self, max_evals):
+    def flow_interp_tripleregs(self, losstype, max_evals):
         # get the best hyper parameter
-        best_hyperparams, _ = opt_hyper(self.data, max_evals = max_evals, st_reg = True)
+        best_hyperparams, _ = opt_hyper(self.data, losstype = losstype,
+                                        max_evals = max_evals, st_reg = True)
         k1 = best_hyperparams['spatial']
         k2 = best_hyperparams['temporal']
         k3 = best_hyperparams['spatiotemporal']
         forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
                                                 coef = np.array([1., k1, k2, k3]),
                                                 neighbor_range = self.n_range,
-                                                search_range = self.s_range)
+                                                search_range = self.s_range,
+                                                losstype = losstype)
         shade_fine = fullinterp(self.shade, forflow, backflow, self.fineness)
         total_fine = (1 - shade_fine)*croparray(self.outer_fine, shade_fine)
         return total_fine, np.array([1., k1, k2, k3])
