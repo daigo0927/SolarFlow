@@ -1,6 +1,8 @@
 
 import numpy as np
 from hyperopt import hp, tpe, Trials, fmin
+from fablic.colors import green
+
 from SmoothFlow_Vreg import smoothflow_withVreg
 from SmoothInterp import fullinterp
 from misc.utils import LinearInterp
@@ -98,6 +100,7 @@ class Interpolater(object):
             self.outer_fine = self.data['outer_fine'][::int(15/fineness)]
 
     def linear_interp(self):
+        print(green('conduct linear interpolation ...'))
         lin = LinearInterp(data = self.shade)
         lin.interp(fineness = self.fineness)
         shade_fine = lin.result
@@ -105,6 +108,7 @@ class Interpolater(object):
         return total_fine
 
     def flow_interp(self, losstype):
+        print(green('conduct non-regularity flow interpolation ...'))
         forflow, backflow = doubleflow_withVreg(fullframes = self.shade,
                                                 coef = np.array([1., 0., 0., 0.]),
                                                 neighbor_range = self.n_range,
@@ -115,6 +119,7 @@ class Interpolater(object):
         return total_fine
         
     def flow_interp_doubleregs(self, losstype, max_evals):
+        print(green('conduct double regularized {} flow interpolation ...'.format(losstype)))
         # get the best hyper parameter
         best_hyperparams, _ = opt_hyper(self.data, losstype = losstype,
                                         max_evals = max_evals, st_reg = False)
@@ -130,6 +135,7 @@ class Interpolater(object):
         return total_fine, np.array([1., k1, k2, 0.])
 
     def flow_interp_tripleregs(self, losstype, max_evals):
+        print(green('conduct triple regularized {} flow interpolation ...'.format(losstype)))
         # get the best hyper parameter
         best_hyperparams, _ = opt_hyper(self.data, losstype = losstype,
                                         max_evals = max_evals, st_reg = True)
