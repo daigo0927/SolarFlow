@@ -21,15 +21,14 @@ from multiprocessing import Pool
 def _wrapper(attr):
     return _process(*attr)
 
-def _process(pkldir, gdata_dir, date, region_name, limit_frame):
+def _process(pkldir, gdata_dir, date, region_name, limit_frame, max_evals):
 
     print('processing data in {} start'.format(pkldir))
 
     # oroginal shade ratio
     data = load_pickles(pkldir)
     # original total radiation data, shape(limit_frame, 40, 40)
-    if limit_frame == -1:
-        limit_frame = data['crop'].shape[0]
+    limit_frame = min(limit_frame, data['crop'].shape[0])
     tdata = data['crop'][:limit_frame]
     sdata = data['shade'][:limit_frame]
     f_origin, w_origin, _ = tdata.shape
@@ -42,18 +41,14 @@ def _process(pkldir, gdata_dir, date, region_name, limit_frame):
 
     # load ground data
     gpath = gdata_dir + '/' + ''.join(date.split('-')) + '_1sec.csv'
-    gdata_origin = pd.read_csv(gpath, header = None)
-    gdata_origin = np.array(gdata_origin)
-    gdata_origin = pad_gdata(gdata_origin)
-    fin_gframe = 32400+(limit_frame-1)*150 # 18h frame
-    gdata = gdata_origin[32399:fin_gframe:150, 1] # 9-18h, every 2.5min, shape(217,)
-    gdata_fine = gdata_origin[32399:fin_gframe:10, 1] # 9-18h, every 10sec shape(3241,)
+    processor = gdata_preprocesser(gdata_dir)
+    gdata = processor.move_avg(limit_frame, 150)
+    gdata_fine = processor.move_avg(limit_frame, 10)
 
     # experiment setting
-    limit_frame = int(limit_frame)
     s_range = int(5)
     n_range = int(2)
-    fine = int(15)
+    fineness = int(15)
 
     shades = OrderedDict()
 
@@ -132,8 +127,8 @@ def main():
                         help = 'objective date, must be [yyyy-mm-dd]')
     parser.add_argument('--region_name', type = str, required = True,
                         help = 'region name, under /row_data/yyyy-mm-dd/pickles, like Tokyo')
-    parser.add_argument('--limit_frame', type = int, default = -1,
-                        help = 'number of frames for utilize, default [-1](all)')
+    parser.add_argument('--limit_frame', type = int, default = 999,
+                        help = 'number of frames for utilize, default [999](all)')
     args = parser.parse_args()
 
     pkldirs = [args.sdata_dir + '/' + d + '/pickles/' + args.region_name\
