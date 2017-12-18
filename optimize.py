@@ -1,7 +1,7 @@
 
 import numpy as np
 from hyperopt import hp, tpe, Trials, fmin
-from fablic.colors import green
+from fabric.colors import green
 
 from SmoothFlow_Vreg import smoothflow_withVreg
 from SmoothInterp import fullinterp
