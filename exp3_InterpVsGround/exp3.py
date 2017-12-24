@@ -64,25 +64,28 @@ def _process(pkldir, gdata_dir, date, region_name, limit_frame, max_evals):
                                                                        max_evals = max_evals)
     result['triple_NCC'], hparams_t_NCC = inter.flow_interp_tripleregs(losstype = 'NCC',
                                                                        max_evals = max_evals)
-
-    # record error
-    simular = np.zeros((limit_frame - 1, len(result.keys())))
+    # record gradients
+    grads = np.zeros((limit_frame - 1, len(result.keys())+1))
     colnames = []
-    print(green('interpolating results testing by ground measured data'))
+    print(green('record interpolated results, with maximum gradients'))
     for i, (key, res) in enumerate(result.items()):
         tvalue = pickPointValue(tvalues = res,
                                 target_idx_origin = obj_idx,
                                 frame_size_origin = frame_size_origin)
-        simular[:, i] = np.array([cosSimular(tvalue[i*fineness:(i+1)*fineness],
-                                             gdata_fine[i*fineness:(i+1)*fineness])
-                                  for i in np.arange(limit_frame - 1)])
+        grads[:, i] = np.array([maxGrad(tvalue[i*fineness:(i+1)*fineness])
+                                for i in np.arange(limit_frame - 1)])
         colnames.append(key)
+    grads[:, -1] = np.array([maxGrad(gdata_fine[i*fineness:(i+1)*fineness])
+                             for i in np.arange(limit_frame - 1)])
+    colnames.append('ground')
 
-    simular = pd.DataFrame(simular)
-    simular.columns = colnames
-    print(simular.describe())
+    grads = pd.DataFrame(grads)
+    grads.columns = colnames
+    print(grads.describe())
         
-    return {'date':region_name+date, 'simularity':simular,
+    return {'date':region_name+date,
+            'gradient':grads, 'result':result,
+            'ground':gdata, 'ground_fine':gdata_fine,
             'hparams_d_MSE':hparams_d_MSE, 'hparams_d_NCC':hparams_d_NCC,
             'hparams_t_MSE':hparams_t_MSE, 'hparams_t_NCC':hparams_t_NCC}
 
@@ -99,6 +102,10 @@ def cosSimular(vec1, vec2):
     norm2 = np.sqrt(np.sum(vec2**2))
     cossim = np.sum(vec1*vec2)/norm1/norm2
     return cossim
+
+def maxGrad(vec):
+    diffs = np.abs(np.diff(vec))
+    return np.max(diffs)
     
 def main():
     parser = argparse.ArgumentParser()
