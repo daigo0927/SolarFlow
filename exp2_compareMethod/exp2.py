@@ -59,7 +59,7 @@ def _process(pkldir, date, region_name, limit_frame, max_evals, validation):
     error.columns = colnames
     print(error.describe())
 
-    return {'date':region_name+date, 'result':result, 'error':error,
+    return {'date':region_name+date, 'data':data, 'result':result, 'error':error,
             'hparams_d_MSE':hparams_d_MSE, 'hparams_d_NCC':hparams_d_NCC,
             'hparams_t_MSE':hparams_t_MSE, 'hparams_t_NCC':hparams_t_NCC}
 
