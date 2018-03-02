@@ -9,19 +9,32 @@ import argparse
 
 from datautil.io import *
 
+def load_double_data(day, sec_stride = 150): # day:'mm-dd'
+    # return satellite(Himawari) and ground measured data
+    day_ = ''.join(day.split('-')) # day_:'mmdd'
+    
+    hpath = '/Users/Daigo/Data/ShadeRatio/TotalRatioSrc/row_data/2017-{}/pickles/Waseda'.format(day)
+    hdata = load_pickles(hpath)
+    gpath = '~/Data/ShadeRatio/120BuildingData/CSV/2017{}_1sec.csv'.format(day_)
+    processer = gdata_preprocesser(gpath)
+    gdata = processer.move_avg(step = sec_stride)
+
+    return hdata, gdata
+    
+
 def compare_Himawari_ground(sec_stride = 150):
 
     # days which has download ground measured solar radiation data
     days = ['03-25', '03-29', '04-01', '04-05']
-    days_ = [''.join(d.split('-')) for d in days]
-
-    for d, d_ in zip(days, days_):
+    
+    for d in days:
+        hdata, gdata = load_double_data(d, sec_stride)
         # h:Himawari, g:ground (120th building)
-        hpath = '/Users/Daigo/Data/ShadeRatio/TotalRatioSrc/row_data/2017-{}/pickles/Waseda'.format(d)
-        hdata = load_pickles(hpath)
-        gpath = '~/Data/ShadeRatio/120BuildingData/CSV/2017{}_1sec.csv'.format(d_)
-        processer = gdata_preprocesser(gpath)
-        gdata = processer.move_avg(step = sec_stride)
+        # hpath = '/Users/Daigo/Data/ShadeRatio/TotalRatioSrc/row_data/2017-{}/pickles/Waseda'.format(d)
+        # hdata = load_pickles(hpath)
+        # gpath = '~/Data/ShadeRatio/120BuildingData/CSV/2017{}_1sec.csv'.format(d_)
+        # processer = gdata_preprocesser(gpath)
+        # gdata = processer.move_avg(step = sec_stride)
         # gdata_fine = processser.move_avg(10)
         # gdata = pd.read_csv(gpath, header = None)
         # gdata = pad_gdata(np.array(gdata))
